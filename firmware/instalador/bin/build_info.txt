@@ -1,0 +1,20 @@
+esp32_ThermoLab.bin — binario precompilado del firmware ThermoLab
+================================================================
+
+Este archivo es una imagen de flash fusionada (bootloader + tabla de
+particiones + aplicación) recortada, lista para escribirse en el offset
+0x0 de la placa. El relleno final de 0xFF (espacio libre hasta el tamaño
+completo de la flash) fue eliminado; al flashear con la opción
+--erase-all de esptool se obtiene el mismo resultado que con la imagen
+completa, sin transmitir los bytes de relleno.
+
+Compilado localmente (versión inicial) a partir de
+firmware/esp32_ThermoLab:
+  Fecha de build:    2026-10-10
+  FQBN:              esp32:esp32:esp32s3usbotg
+  arduino-cli:       1.5.0
+  Core esp32:esp32:  3.3.7
+
+Este archivo se regenera automáticamente con GitHub Actions
+(.github/workflows/build-firmware.yml) en cada push que modifique
+firmware/esp32_ThermoLab. No lo edite manualmente.

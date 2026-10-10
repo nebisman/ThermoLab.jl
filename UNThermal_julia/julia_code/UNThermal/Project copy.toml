@@ -1,7 +1,0 @@
-name = "UNThermal"
-uuid = "e7a9ab87-c617-45b1-8476-4469afc7ea26"
-version = "1.0.0"
-authors = ["LB"]
-
-[compat]
-julia = "1.9"

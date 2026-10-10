@@ -1,0 +1,103 @@
+name: Build ESP32 Firmware
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'firmware/esp32_ThermoLab/**'
+      - '.github/workflows/build-firmware.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-firmware-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Compilar firmware ESP32 (esp32:esp32:esp32s3usbotg)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Instalar Arduino CLI
+        run: |
+          mkdir -p "$HOME/bin"
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$HOME/bin" sh
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Instalar el core ESP32 de Espressif
+        run: |
+          arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          arduino-cli core install esp32:esp32 --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+
+      - name: Instalar librerías Arduino requeridas
+        run: arduino-cli lib install "ESP32Encoder" "ArduinoJson" "Adafruit NeoPixel" "OneWire" "DallasTemperature"
+
+      - name: Compilar el firmware (binario fusionado)
+        run: |
+          arduino-cli compile --verbose --fqbn esp32:esp32:esp32s3usbotg \
+            --export-binaries --output-dir build \
+            firmware/esp32_ThermoLab
+
+      - name: Recortar el relleno final del binario fusionado
+        run: |
+          python3 - <<'PY'
+          data = open("build/esp32_ThermoLab.ino.merged.bin", "rb").read()
+          i = len(data) - 1
+          while i >= 0 and data[i] == 0xFF:
+              i -= 1
+          trimmed = data[: i + 1]
+          open("firmware/instalador/bin/esp32_ThermoLab.bin", "wb").write(trimmed)
+          print(f"Tamaño original: {len(data)} bytes -> recortado: {len(trimmed)} bytes")
+          PY
+          sha256sum firmware/instalador/bin/esp32_ThermoLab.bin
+
+      - name: Subir el binario como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: esp32_ThermoLab-firmware
+          path: firmware/instalador/bin/esp32_ThermoLab.bin
+          retention-days: 14
+
+      - name: Generar build_info.txt
+        run: |
+          ARDUINO_CLI_VERSION="$(arduino-cli version | grep -oP 'Version: \K\S+')"
+          read -r CORE_INSTALLED CORE_LATEST <<<"$(arduino-cli core list | awk '/^esp32:esp32/ {print $2, $3}')"
+          cat > firmware/instalador/bin/build_info.txt <<EOF
+          esp32_ThermoLab.bin — binario precompilado del firmware ThermoLab
+          ================================================================
+
+          Este archivo es una imagen de flash fusionada (bootloader + tabla de
+          particiones + aplicación) recortada, lista para escribirse en el offset
+          0x0 de la placa. El relleno final de 0xFF (espacio libre hasta el tamaño
+          completo de la flash) fue eliminado; al flashear con la opción
+          --erase-all de esptool se obtiene el mismo resultado que con la imagen
+          completa, sin transmitir los bytes de relleno.
+
+          Generado automáticamente por GitHub Actions
+          (.github/workflows/build-firmware.yml) a partir de
+          firmware/esp32_ThermoLab:
+            Commit fuente:     ${GITHUB_SHA}
+            Fecha de build:    $(date -u +%Y-%m-%d)
+            FQBN:              esp32:esp32:esp32s3usbotg
+            arduino-cli:       ${ARDUINO_CLI_VERSION}
+            Core esp32:esp32:  ${CORE_INSTALLED} (instalado; índice disponible ${CORE_LATEST})
+
+          Este archivo se regenera automáticamente en cada push que modifique
+          firmware/esp32_ThermoLab. No lo edite manualmente.
+          EOF
+
+      - name: Confirmar y subir el binario al repositorio
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add firmware/instalador/bin/esp32_ThermoLab.bin firmware/instalador/bin/build_info.txt
+          if git diff --cached --quiet; then
+            echo "El binario no cambió; no se crea commit."
+          else
+            git commit -m "Actualizar firmware precompilado [skip ci]"
+            git push origin "HEAD:${{ github.ref_name }}"
+          fi

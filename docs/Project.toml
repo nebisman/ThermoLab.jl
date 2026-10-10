@@ -1,0 +1,6 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+ThermoLab = "0a0d4094-905b-4e2c-9d78-bbc5dd14d6df"
+
+[compat]
+Documenter = "1"
