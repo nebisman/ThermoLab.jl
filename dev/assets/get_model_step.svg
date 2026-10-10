@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="990" height="620" viewBox="0 0 990 620">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#666666"/></marker></defs>
+<rect width="990" height="620" fill="white"/>
+<g transform="translate(50,0)">
+<polyline points="80.0,300.0 275.0,300.0 275.0,300.0 277.9,294.9 280.9,290.0 283.8,285.2 286.7,280.5 289.6,275.9 292.6,271.4 295.5,267.1 298.4,262.8 301.3,258.6 304.2,254.6 307.2,250.6 310.1,246.7 313.0,243.0 315.9,239.3 318.9,235.7 321.8,232.2 324.7,228.8 327.6,225.4 330.6,222.2 333.5,219.0 336.4,215.9 339.4,212.8 342.3,209.9 345.2,207.0 348.1,204.2 351.1,201.4 354.0,198.7 356.9,196.1 359.8,193.6 362.8,191.1 365.7,188.6 368.6,186.3 371.5,183.9 374.4,181.7 377.4,179.5 380.3,177.3 383.2,175.2 386.1,173.2 389.1,171.2 392.0,169.2 394.9,167.3 397.9,165.4 400.8,163.6 403.7,161.9 406.6,160.1 409.6,158.4 412.5,156.8 415.4,155.2 418.3,153.6 421.2,152.1 424.2,150.6 427.1,149.1 430.0,147.7 432.9,146.3 435.9,145.0 438.8,143.6 441.7,142.3 444.6,141.1 447.6,139.8 450.5,138.6 453.4,137.5 456.4,136.3 459.3,135.2 462.2,134.1 465.1,133.1 468.1,132.0 471.0,131.0 473.9,130.0 476.8,129.1 479.8,128.1 482.7,127.2 485.6,126.3 488.5,125.4 491.4,124.6 494.4,123.8 497.3,122.9 500.2,122.1 503.1,121.4 506.1,120.6 509.0,119.9 511.9,119.2 514.9,118.5 517.8,117.8 520.7,117.1 523.6,116.4 526.5,115.8 529.5,115.2 532.4,114.6 535.3,114.0 538.2,113.4 541.2,112.9 544.1,112.3 547.0,111.8 550.0,111.2 552.9,110.7 555.8,110.2 558.7,109.7 561.6,109.3 564.6,108.8 567.5,108.3 570.4,107.9 573.4,107.5 576.3,107.1 579.2,106.6 582.1,106.2 585.0,105.9 588.0,105.5 590.9,105.1 593.8,104.7 596.8,104.4 599.7,104.0 602.6,103.7 605.5,103.4 608.5,103.0 611.4,102.7 614.3,102.4 617.2,102.1 620.1,101.8 623.1,101.5 626.0,101.3 628.9,101.0 631.9,100.7 634.8,100.5 637.7,100.2 640.6,100.0 643.5,99.7 646.5,99.5 649.4,99.3 652.3,99.0 655.2,98.8 658.2,98.6 661.1,98.4 664.0,98.2 667.0,98.0 669.9,97.8 672.8,97.6 675.7,97.4 678.6,97.3 681.6,97.1 684.5,96.9 687.4,96.8 690.4,96.6 693.3,96.4 696.2,96.3 699.1,96.1 702.0,96.0 705.0,95.8 707.9,95.7 710.8,95.6 713.8,95.4 716.7,95.3 719.6,95.2 722.5,95.0 725.5,94.9 728.4,94.8 731.3,94.7 734.2,94.6 737.1,94.5 740.1,94.4 743.0,94.3 745.9,94.1 748.9,94.0 751.8,94.0 754.7,93.9 757.6,93.8 760.5,93.7 763.5,93.6 766.4,93.5 769.3,93.4 772.2,93.3 775.2,93.3 778.1,93.2 781.0,93.1 784.0,93.0 786.9,92.9 789.8,92.9 792.7,92.8 795.6,92.7 798.6,92.7 801.5,92.6 804.4,92.5 807.4,92.5 810.3,92.4 813.2,92.4 816.1,92.3 819.0,92.3 822.0,92.2 824.9,92.1 827.8,92.1 830.8,92.0 833.7,92.0 836.6,91.9 839.5,91.9 842.5,91.9 845.4,91.8 848.3,91.8 851.2,91.7 854.1,91.7 857.1,91.6 860.0,91.6" fill="none" stroke="#ff2a7f" stroke-width="2.2" stroke-linejoin="round" />
+<polyline points="80.0,500.0 250.0,500.0 250.0,420.0 860.0,420.0" fill="none" stroke="#00a0c8" stroke-width="2.2" stroke-linejoin="round" />
+<line x1="40" y1="300" x2="860" y2="300" stroke="#666666" stroke-width="1.2" stroke-dasharray="5,4"/>
+<text x="36" y="307" fill="#16829b" font-size="20" text-anchor="end" style="font-family:'DejaVu Sans Mono',monospace">yop</text>
+<line x1="250" y1="90" x2="860" y2="90" stroke="#666666" stroke-width="1.2" stroke-dasharray="5,4"/>
+<line x1="190" y1="300" x2="190" y2="90" stroke="#666666" stroke-width="1.3" marker-start="url(#a)" marker-end="url(#a)"/>
+<text x="180" y="202.0" fill="#666666" font-size="19" text-anchor="end" style="font-family:'DejaVu Sans Mono',monospace">Δy</text>
+<line x1="250" y1="500" x2="870" y2="500" stroke="#666666" stroke-width="1.2" stroke-dasharray="5,4"/>
+<line x1="740" y1="420" x2="870" y2="420" stroke="#666666" stroke-width="1.2" stroke-dasharray="5,4"/>
+<line x1="830" y1="500" x2="830" y2="420" stroke="#666666" stroke-width="1.3" marker-start="url(#a)" marker-end="url(#a)"/>
+<rect x="815" y="450" width="104.85999999999999" height="22.950000000000003" fill="white"/>
+<text x="820" y="467" fill="#666666" font-size="17" text-anchor="end" style="font-family:'DejaVu Sans Mono',monospace">amplitude</text>
+<line x1="250" y1="60" x2="250" y2="540" stroke="#bbbbbb" stroke-width="1.2" stroke-dasharray="5,4"/>
+<line x1="275" y1="330" x2="275" y2="345" stroke="#666666" stroke-width="1.2" />
+<line x1="250" y1="340" x2="275" y2="340" stroke="#666666" stroke-width="1.3" marker-start="url(#a)" marker-end="url(#a)"/>
+<text x="264.5" y="365" fill="#666666" font-size="18" text-anchor="middle" style="font-family:'DejaVu Sans Mono',monospace">L</text>
+<text x="650" y="260" fill="#ff2a7f" font-size="18" text-anchor="middle" style="font-family:'DejaVu Serif',serif;font-style:italic">Temperatura y(t)</text>
+<text x="650" y="285" fill="#ff2a7f" font-size="16" text-anchor="middle" style="font-family:'DejaVu Serif',serif;font-style:italic">y modelo FOTD</text>
+<text x="600" y="400" fill="#00a0c8" font-size="18" text-anchor="middle" style="font-family:'DejaVu Serif',serif;font-style:italic">Escalón de potencia u(t)</text>
+<text x="560" y="40" fill="#666666" font-size="18" text-anchor="middle" style="font-family:'DejaVu Serif',serif;font-style:italic">G(s) = α e^(−Ls) / (τ s + 1),   α = Δy / amplitude</text>
+<line x1="250" y1="555" x2="250" y2="592" stroke="#666666" stroke-width="1.2" stroke-dasharray="5,4"/>
+<line x1="860" y1="555" x2="860" y2="592" stroke="#666666" stroke-width="1.2" stroke-dasharray="5,4"/>
+<line x1="250" y1="580" x2="860" y2="580" stroke="#666666" stroke-width="1.3" marker-start="url(#a)" marker-end="url(#a)"/>
+<rect x="538.84" y="569" width="32.32" height="24.3" fill="white"/>
+<text x="555.0" y="587" fill="#666666" font-size="18" text-anchor="middle" style="font-family:'DejaVu Sans Mono',monospace">t1</text>
+</g>
+</svg>
