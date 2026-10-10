@@ -1,0 +1,21 @@
+# Julia
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+deps/deps.jl
+deps/build.log
+docs/build/
+Manifest.toml
+
+# Firmware (PlatformIO / ESP-IDF / Arduino)
+.pio/
+build/
+sdkconfig.old
+managed_components/
+
+# Editores y sistema
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
