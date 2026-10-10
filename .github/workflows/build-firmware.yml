@@ -56,7 +56,7 @@ jobs:
           sha256sum firmware/instalador/bin/esp32_ThermoLab.bin
 
       - name: Subir el binario como artefacto
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: esp32_ThermoLab-firmware
           path: firmware/instalador/bin/esp32_ThermoLab.bin
