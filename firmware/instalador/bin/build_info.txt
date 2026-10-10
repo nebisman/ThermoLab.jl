@@ -8,13 +8,14 @@ completo de la flash) fue eliminado; al flashear con la opción
 --erase-all de esptool se obtiene el mismo resultado que con la imagen
 completa, sin transmitir los bytes de relleno.
 
-Compilado localmente (versión inicial) a partir de
+Generado automáticamente por GitHub Actions
+(.github/workflows/build-firmware.yml) a partir de
 firmware/esp32_ThermoLab:
+  Commit fuente:     48d10c27e9915291ea93ad7408a8acbac6cf6e70
   Fecha de build:    2026-10-10
   FQBN:              esp32:esp32:esp32s3usbotg
-  arduino-cli:       1.5.0
-  Core esp32:esp32:  3.3.7
+  arduino-cli:       1.5.1
+  Core esp32:esp32:  3.3.12 (instalado; índice disponible 3.3.12)
 
-Este archivo se regenera automáticamente con GitHub Actions
-(.github/workflows/build-firmware.yml) en cada push que modifique
+Este archivo se regenera automáticamente en cada push que modifique
 firmware/esp32_ThermoLab. No lo edite manualmente.
