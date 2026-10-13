@@ -48,7 +48,7 @@ set_reference(sys, 50.0)
 """
 function set_reference(sys::ThermalSystem, ref_value::Real = DEFAULT_REFERENCE)
     ref_value <= MAX_TEMPERATURE ||
-        error("La referencia no debe superar $(MAX_TEMPERATURE) °C")
+        error("La temperatura de referencia no debe superar $(MAX_TEMPERATURE) °C")
     connect!(sys)
     send_command!(sys, "set_ref", Dict("reference" => float2hex(ref_value)))
     disconnect!(sys)

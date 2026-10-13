@@ -97,12 +97,11 @@ function _run_open_loop!(sys, total, stab_pts, uee_pts, title_str, xmax, ylim, u
     end
 
     try
-        receive_samples!(sys, total, on_sample)
+        receive_samples!(sys, total, on_sample; timeout = 5.0)
     catch e
         println("Error: ", e)
     end
     set_reference(sys, DEFAULT_REFERENCE)
-
     t_exp = te .- h * (stab_pts + uee_pts + 1)
     return t_exp, ue, ye
 end
@@ -173,17 +172,31 @@ t, u, y = step_open(sys; yop=50, amplitude=10, t1=600);
 function step_open(sys::ThermalSystem;
                    yop::Real       = 50.0,
                    amplitude::Real = 10.0,
-                   t1::Real        = 600.0,
-                   stab_time::Real = 60.0,
+                   t1::Real        = 360.0,
+                   stab_time::Real = 50.0,
                    uee_time::Real  = 10.0)
 
-    _, K = _operating_point(sys, yop, amplitude)
+
+
+  
 
     h        = SAMPLING_TIME
     stab_pts = round(Int, stab_time / h)
     uee_pts  = round(Int, uee_time / h)
-    step_pts = round(Int, t1 / h)
-    total    = stab_pts + uee_pts + step_pts + 1
+    step_pts = round(Int, t1 / h) + 2
+    total    = stab_pts + uee_pts + step_pts
+    t_total  = total * h
+
+
+
+    uf_est, K = _operating_point(sys, yop, amplitude)
+    percent = 0.2
+
+    ymax = yop + K * amplitude + 5
+    ymin = yop - 5
+    umax = uf_est + (1 + percent) * amplitude
+    umin =  minimum([0, uf_est - (1 + percent) * amplitude])
+
 
     payload = Dict(
         "amplitude"   => float2hex(amplitude),
@@ -192,23 +205,92 @@ function step_open(sys::ThermalSystem;
         "uee_points"  => long2hex(uee_pts),
         "points_high" => long2hex(step_pts),
     )
+    tv_stab, uv_stab, yv_stab = Float64[], Float64[], Float64[]
+    tv_step, uv_step, yv_step = Float64[], Float64[], Float64[]
+    tstep = h * (stab_pts + uee_pts + 1)
 
-    title_str = "Escalón en lazo abierto  yop=$(@sprintf("%.1f",yop)) °C, duración=$(@sprintf("%.0f",(total-1)*h)) s"
-    xmax = (total - 1) * h
-    ylim = (min(yop - 5, temp_from_power(sys, 0) - 2), yop + K*amplitude + 5)
-    ulim = (-2, 102)
-    redraw!(plot(layout=(2, 1), size=(900, 500), title=[title_str ""],
-        ylabel=["Temperatura (°C)" "Potencia (%)"], xlabel=["" "Tiempo (s)"],
-        xlims=[(0, xmax) (0, xmax)], ylims=[ylim ulim],
-        background_color_subplot=[:ivory :mintcream], margin=5Plots.mm))
+    plt = plot(layout=(2, 1), size=(900, 500),
+        title=["Escalón en lazo abierto - yop=$(@sprintf("%.1f",yop)) °C" ""],
+        ylabel=["Temperatura (°C)" "Potencia (%)"],
+        xlabel=["" "Tiempo (s)"],
+        xlims=[(0, t_total) (0, t_total)],
+        ylims=[(ymin, ymax) (umin, umax)],
+        background_color_subplot=[:ivory :mintcream],
+        legend=:bottomright, grid=true, gridalpha=0.15, margin=5Plots.mm)
+    redraw!(plt)
 
-    connect!(sys)
+    connect!(sys)    
     send_command!(sys, "step_open", payload)
-    tv, uv, yv = _run_open_loop!(sys, total, stab_pts, uee_pts, title_str, xmax, ylim, ulim)
+     
+    on_sample = function(msg, np_val)
 
-    save_experiment([tv, uv, yv], "ThermoLab_step_open_exp.csv", "t,u,y")
-    return tv, uv, yv
+        t_curr = np_val * h        
+        y_curr = hex2float(string(msg["y"]))
+        u_curr = hex2float(string(msg["u"]))
+
+        plt = plot(layout=(2, 1), size=(900, 500),
+            title=["Escalón en lazo abierto - yop=$(@sprintf("%.1f",yop)) °C" ""],
+            ylabel=["Temperatura (°C)" "Potencia (%)"],
+            xlabel=["" "Tiempo (s)"],
+            xlims=[(0, t_total) (0, t_total)],
+            ylims=[(ymin, ymax) (0, 100)],
+            background_color_subplot=[:ivory :mintcream],
+            legend=[:topleft :bottomright], grid=true, gridalpha=0.15, margin=5Plots.mm)
+
+        leg_size = 9
+        temp_str = @sprintf("y(t) = %.2f °C", y_curr)
+        power_str =  @sprintf("u(t) = %.2f %% (de 2.475 W)", u_curr)
+
+        if np_val <= stab_pts         
+       
+            push!(tv_stab, t_curr); push!(yv_stab, y_curr); push!(uv_stab, u_curr)
+            plot!(plt, subplot=1, tv_stab, yv_stab, label=temp_str, color="#ff6600", alpha=0.8,
+            legendfontsize = leg_size, fg_legend = "#d4aa00", linewidth=1.5, ls = :dot)
+            plot!(plt, subplot=2, tv_stab, uv_stab, label=power_str, color="#2ca02c",
+            legendfontsize = leg_size, fg_legend= "#5fbcd3", alpha=0.8, linewidth=1.5,  ls = :dot)
+
+
+
+        else            
+            ylims!(plt, subplot=2, (uv_stab[end-2] -4, uv_stab[end-2] + amplitude + 4))
+            if np_val == stab_pts  + 1
+                push!(tv_stab, t_curr); push!(yv_stab, y_curr); push!(uv_stab, u_curr)
+            end
+            push!(tv_step, t_curr); push!(yv_step, y_curr); push!(uv_step, u_curr)
+            plot!(plt, subplot=1, tv_step, yv_step, label=temp_str, color="#d40055", linewidth=1.5,
+            legendfontsize = leg_size, fg_legend = "#d4aa00")
+            plot!(plt, subplot=2, tv_step, uv_step, label=power_str            
+            , color="#2ca02c",  seriestype=:steppre,
+
+            legendfontsize = leg_size, fg_legend= "#5fbcd3",  linewidth=1.5)
+            plot!(plt, subplot=1, tv_stab, yv_stab, label="", color="#ff6600",
+             ls = :dot, alpha=0.8, linewidth=1.5)            
+            plot!(plt, subplot=2, tv_stab, uv_stab, label="", color="#2ca02c",
+             ls = :dot, alpha=0.8, linewidth=1.5)
+
+
+        end
+        
+        redraw!(plt)
+    end
+
+    try
+        receive_samples!(sys, total, on_sample; timeout=5.0)
+    catch e
+        println("Error: ", e)
+    end
+    
+    set_reference(sys, DEFAULT_REFERENCE)  # Volver a referencia cero al finalizar
+    
+    t_rep = tv_step .- tstep    
+    # Volver a referencia de 40° al finalizar
+    set_reference(sys, DEFAULT_REFERENCE);   
+    save_experiment([t_rep, uv_step, yv_step], "ThermoLab_step_open_exp.csv", "t,u,y")
+    
+    return tv_step, uv_step, yv_step
+
 end
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -280,47 +362,114 @@ t, u, y = prbs_open(sys; yop=50, amplitude=4, divider=25);
 """
 function prbs_open(sys::ThermalSystem;
                    yop::Real       = 50.0,
-                   amplitude::Real = 4.0,
-                   stab_time::Real = 60.0,
+                   amplitude::Real = 5.0,
+                   stab_time::Real = 90.0,
                    uee_time::Real  = 10.0,
-                   divider::Int    = 25)
+                   divider::Int    = 25,
+                   usefile::Bool   = false)
 
-    _, K = _operating_point(sys, yop, amplitude; symmetric=true)
 
-    h        = SAMPLING_TIME
-    stab_pts = round(Int, stab_time / h)
-    uee_pts  = round(Int, uee_time / h)
-    prbs_pts = PRBS_LENGTH * divider
-    total    = stab_pts + uee_pts + prbs_pts + 1
+    h           = SAMPLING_TIME  
+    stab_pts    = ceil(Int, stab_time / h)
+    uee_pts     = ceil(Int, uee_time / h)
+    points = divider * PRBS_LENGTH + stab_pts + uee_pts 
+    total_time = points * h
+
+
+    uf_est, K = _operating_point(sys, yop, amplitude)
+    percent = 0.2
+    ymax = yop + K * amplitude + 2
+    ymin = yop - K * amplitude - 2
+    umax = uf_est + (1 + percent) * amplitude
+    umin =  minimum([0, uf_est - (1 + percent) * amplitude - 5.0])
+
+
+    tv_prbs, uv_prbs, yv_prbs = Float64[], Float64[], Float64[]
+    tv_stab, uv_stab, yv_stab = Float64[], Float64[], Float64[]
+
+    plt = plot(layout=(2, 1), size=(900, 500),
+        title=["PRBS  yop=$(@sprintf("%.1f",yop)) °C con duración=$(@sprintf("%.0f",total_time)) s" ""],
+        ylabel=["Temperatura (°C)" "Potencia (%)"],
+        xlabel=["" "Tiempo (s)"],
+        xlims=[(0, total_time) (0, total_time)],
+        ylims=[(ymin, ymax) (umin, umax)],
+        background_color_subplot=[:ivory :mintcream],
+        legend=:bottomright, grid=true, gridalpha=0.15, margin=5Plots.mm)
+    display(plt)
 
     payload = Dict(
-        "peak_amp"    => float2hex(amplitude),
-        "op_point"    => float2hex(yop),
+        "peak_amp" => float2hex(amplitude),
+        "op_point"       => float2hex(yop),  
         "stab_points" => long2hex(stab_pts),
         "uee_points"  => long2hex(uee_pts),
-        "divider"     => long2hex(divider),
+        "divider"   => long2hex(divider),
     )
 
-    title_str = "PRBS  yop=$(@sprintf("%.1f",yop)) °C, duración=$(@sprintf("%.0f",(total-1)*h)) s"
-    xmax = (total - 1) * h
-    ylim = (min(yop - K*amplitude - 3, temp_from_power(sys, 0) - 2), yop + K*amplitude + 3)
-    ulim = (-2, 102)
-    redraw!(plot(layout=(2, 1), size=(900, 500), title=[title_str ""],
-        ylabel=["Temperatura (°C)" "Potencia (%)"], xlabel=["" "Tiempo (s)"],
-        xlims=[(0, xmax) (0, xmax)], ylims=[ylim ulim],
-        background_color_subplot=[:ivory :mintcream], margin=5Plots.mm))
 
     connect!(sys)
     send_command!(sys, "prbs_open", payload)
-    tv, uv, yv = _run_open_loop!(sys, total, stab_pts, uee_pts, title_str, xmax, ylim, ulim)
 
-    # Solo se conserva la señal PRBS (t >= 0)
-    idx = findall(>=(0), tv)
-    tv, uv, yv = tv[idx], uv[idx], yv[idx]
+     on_sample = function(msg, np_val)
 
-    save_experiment([tv, uv, yv], "ThermoLab_prbs_open_exp.csv", "t,u,y")
-    return tv, uv, yv
+        t_curr = np_val * h        
+        y_curr = hex2float(string(msg["y"]))
+        u_curr = hex2float(string(msg["u"]))
+
+        plt = plot(layout=(2, 1), size=(900, 500),
+            title=["PRBS  yop=$(@sprintf("%.1f",yop)) °C, duración=$(@sprintf("%.0f",total_time)) s" ""],
+            ylabel=["Temperatura (°C)" "Potencia (%)"],
+            xlabel=["" "Tiempo (s)"],
+            xlims=[(0, total_time) (0, total_time)],
+            ylims=[(ymin, ymax) (umin, umax)],
+            background_color_subplot=[:ivory :mintcream],
+            legend=[:topleft :bottomright], grid=true, gridalpha=0.15, margin=5Plots.mm)
+
+        leg_size = 9
+        temp_str = @sprintf("y(t) = %.2f °C", y_curr)
+        power_str =  @sprintf("u(t) = %.2f %% (de 2.475 W)", u_curr)
+
+        if np_val <= stab_pts + uee_pts       
+       
+            push!(tv_stab, t_curr); push!(yv_stab, y_curr); push!(uv_stab, u_curr)
+            plot!(plt, subplot=1, tv_stab, yv_stab, label=temp_str, color="#ff6600", alpha=0.5,
+            legendfontsize = leg_size, fg_legend = "#d4aa00", linewidth=1.5)
+            plot!(plt, subplot=2, tv_stab, uv_stab, label=power_str, color="#2ca02c",
+            legendfontsize = leg_size, fg_legend= "#5fbcd3", alpha=0.5, linewidth=1.5)
+
+
+
+        else            
+            ylims!(plt, subplot=2, (uv_stab[end-2] - amplitude - 2, uv_stab[end-2] + amplitude + 2))
+            if np_val == stab_pts + uee_pts + 1
+                push!(tv_stab, t_curr); push!(yv_stab, y_curr); push!(uv_stab, u_curr)
+            end
+            push!(tv_prbs, t_curr); push!(yv_prbs, y_curr); push!(uv_prbs, u_curr)
+            plot!(plt, subplot=1, tv_prbs, yv_prbs, label=temp_str, color="#d40055", linewidth=1.5,
+            legendfontsize = leg_size, fg_legend = "#d4aa00")
+            plot!(plt, subplot=2, tv_prbs, uv_prbs, label=power_str, color="#2ca02c",  seriestype=:steppre,
+            legendfontsize = leg_size, fg_legend= "#5fbcd3", linewidth=1.5)
+
+            plot!(plt, subplot=1, tv_stab, yv_stab, label="", color="#ff6600", alpha=0.5, linewidth=1.5)            
+            plot!(plt, subplot=2, tv_stab, uv_stab, label="", color="#2ca02c", alpha=0.5, linewidth=1.5)
+
+
+        end         
+        redraw!(plt)
+    end
+
+
+    try
+        receive_samples!(sys, points, on_sample; timeout=5.0)
+    catch e
+        println("Error: ", e)
+    end
+    
+    set_reference(sys, DEFAULT_REFERENCE)  # Volver a referencia por defecto al finalizat
+    save_experiment([tv_prbs, uv_prbs, yv_prbs], "ThermoLab_prbs_open_exp.csv", "t,u,y")
+    return tv_prbs, uv_prbs, yv_prbs
 end
+
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -328,65 +477,85 @@ end
 # ═══════════════════════════════════════════════════════════════════════════════
 
 """Escalón en lazo cerrado hasta `r_ref`. Retorna la potencia y temperatura estacionarias."""
-function _step_static(sys::ThermalSystem, r_ref::Real, duration::Real,
-                      uee::Vector{Float64}, yee::Vector{Float64})
-
-    h        = SAMPLING_TIME
-    pts_high = round(Int, duration / h)
-    leg_size = 9
-
+function _step_static(sys::ThermalSystem, r_ref::Real, uee, yee; t1::Real = 60.0)
+    
+    h       = SAMPLING_TIME
+    pts     = round(Int, t1 / h) + 1
     payload = Dict(
         "low_val"     => float2hex(r_ref),
-        "high_val"    => float2hex(r_ref),
+        "high_val"    => float2hex(r_ref),        
+        "points_high" => long2hex(pts),
         "points_low"  => long2hex(0),
-        "points_high" => long2hex(pts_high),
     )
+    
+    yv = Float64[]
+    uv = Float64[]
+    tv = Float64[]
 
-    tv, uv, yv = Float64[], Float64[], Float64[]
+    leg_size = 8
 
-    ee_str = isempty(yee) ? "" :
-        latexstring(@sprintf("u_{ee} = %.2f\\,\\%% \\to y_{ee} = %.2f\\,^\\circ C", uee[end], yee[end]))
 
     connect!(sys)
     send_command!(sys, "step_closed", payload)
-
     on_sample = function(msg, np_val)
-        push!(tv, np_val * h)
-        push!(yv, hex2float(string(msg["y"])))
-        push!(uv, hex2float(string(msg["u"])))
+        t_curr = (np_val) * h
+        y_curr = hex2float(string(msg["y"]))
+        u_curr = hex2float(string(msg["u"]))   
+     
+        push!(tv, t_curr); push!(yv, y_curr); push!(uv, u_curr);         
+        
 
-        pl_ins = plot(tv, yv, label=@sprintf("y(t) = %.2f °C", yv[end]),
-                      color="#00aad4", legendfontsize=leg_size,
-                      fg_legend="#5fbcd3", linewidth=1.5)
-        plot!(pl_ins, tv, uv, label=@sprintf("u(t) = %.2f %%", uv[end]),
-              color="#44aa00", linewidth=1.5)
-        hline!(pl_ins, [r_ref]; ls=:dot, color=:gray, label="")
 
-        pl_ee = scatter(uee, yee, color="#d40055", marker=:circle, label=ee_str,
-                        legendfontsize=leg_size, fg_legend="#d4aa00", markersize=4)
+            y_str = @sprintf("y(t) = %.2f °C", y_curr)
+            u_str = @sprintf("u(t) = %.2f °C", u_curr)
+            
 
-        plt = plot(pl_ins, pl_ee, layout=(1, 2), size=(900, 500),
-            title=["Experimento actual (r = $(@sprintf("%.0f", r_ref)) °C)" "Curva estática – ThermoLab"],
-            xlabel=["Tiempo (s)" "Potencia (%)"],
-            ylabel=["Temperatura (°C) y potencia (%)" "Temperatura estacionaria (°C)"],
-            xlims=[(0, duration) (0, 100)],
+            if isempty(yee)
+                ee_str=""
+            else
+                ee_str = @sprintf("uee = %.2f %%    yee=%0.2f °C", uee[end], yee[end])
+            end
+            
+            
+            p_ee = scatter(uee, yee, color="#d40055", marker=:circle,label = ee_str,
+            legendfontsize = leg_size, fg_legend = "#d4aa00", markersize=4, linewidth=1.5)
+                 
+
+            p_ins = plot(tv, yv, label=y_str, color="#00aad4",
+             legendfontsize = leg_size, fg_legend= "#5fbcd3", linewidth=1.5)
+
+           
+            plot!(p_ins, tv, uv, label=u_str, color="#44aa00", linewidth=1.5)
+            hline!(p_ins, [r_ref], label="Referencia", color=:gray, ls=:dash, linewidth=1)
+            
+            plt = plot( p_ins, p_ee, layout=(1, 2), size=(900, 500),
+            title=["Curva estática – ThermoLab" "Experimento actual"],
+            xlabel=[ "Tiempo (s)" "Potencia (%)"],
+            ylabel=["Temp. (°C) y potencia (%) actual" "Temperatura estacionaria (°C)" ], 
+            xlims=[ (0,t1) (0, 60)] ,
             ylims=[(0, 100) (20, 100)],
-            background_color_subplot=[:mintcream :ivory],
-            legend=[:topleft :bottomright],
+            background_color_subplot=[ :mintcream :ivory],
+            legend=[:bottomright :bottomright ], 
             grid=true, gridalpha=0.2,
             xticks=0:10:100, yticks=0:10:100,
             margin=5Plots.mm)
-        redraw!(plt)
-    end
+            redraw!(plt)
 
+       
+    end
     try
-        receive_samples!(sys, pts_high + 1, on_sample)
+        receive_samples!(sys, pts, on_sample; timeout=5.0)
     catch e
-        println("Error en el punto estático $(r_ref) °C: ", e)
+        println("Error en punto estático $(r_ref) °C: $e")
+   
     end
 
-    n_ee = min(10, length(yv))
-    return mean(uv[end-n_ee+1:end]), mean(yv[end-n_ee+1:end])
+    n_ee =length(yv) - 10
+    uee_curr = mean(uv[n_ee:end])
+    yee_curr = mean(yv[n_ee:end])
+    
+
+    return uee_curr, yee_curr
 end
 
 
@@ -457,59 +626,86 @@ uee, yee = get_static_model(sys);
 ```
 """
 function get_static_model(sys::ThermalSystem;
-                          step::Real = 5.0, duration::Real = 60.0,
+                          step::Real    = 5.0, t1::Real = 40.0,
                           usefile::Bool = false)
     if usefile
-        uee, yee = read_csv_file(_datafile("ThermoLab_static_gain_response.csv"))
+        uss, yss = read_csv_file(PATH_DATA * "Thermal_static_gain_response.csv")
     else
-        uee, yee = Float64[], Float64[]
-        for yi in DEFAULT_REFERENCE:step:MAX_TEMPERATURE
-            uss, yss = _step_static(sys, yi, duration, uee, yee)
-            push!(uee, uss)
-            push!(yee, yss)
-        end
-        set_reference(sys, DEFAULT_REFERENCE)
+
+
+        plt = plot(layout=(1, 2), size=(900, 500),
+            title=["Curva estática – ThermoLab" "Experimento actual"],
+            xlabel=[ "Tiempo (s)" "Potencia (%)"],
+            ylabel=["Temp. (°C) y potencia (%) actual" "Temperatura estacionaria (°C)" ], 
+            xlims=[ (0,t1) (0, 60)] ,
+            ylims=[(0, 100) (20, 100)],
+            background_color_subplot=[ :mintcream :ivory],
+            legend=[:bottomright :bottomright ], 
+            grid=true, gridalpha=0.2,
+            xticks=0:10:100, yticks=0:10:100,
+            margin=5Plots.mm)
+            redraw!(plt)
+
+        uss      = Float64[]
+        yss      = Float64[]
+        y_targets = collect(40.0:step:MAX_TEMPERATURE) 
+    
+        for yi in y_targets        
+            uee_curr, yee_curr = _step_static(sys, yi , uss, yss; t1=t1)
+            push!(uss, uee_curr)
+            push!(yss, yee_curr)       
+            
+        end    
     end
 
-    # Regresión lineal: yee = K*uee + b
-    A      = hcat(uee, ones(length(uee)))   # matriz de diseño [u 1]
-    coeffs = A \ yee                        # mínimos cuadrados
+
+    
+     # ── Regresión lineal: yss = K*uss + b ──────────────────────────────────
+    A      = hcat(uss, ones(length(uss)))   # matriz de diseño [u 1]
+    coeffs = A \ yss                        # mínimos cuadrados
     K, b   = coeffs[1], coeffs[2]
 
-    u_fit  = range(0, maximum(uee) + 5, length=100)
+    u_fit  = range(minimum(uss), maximum(uss), length=100)
     y_fit  = K .* u_fit .+ b
 
-    R²     = 1 - sum((yee .- (K .* uee .+ b)).^2) /
-                 sum((yee .- mean(yee)).^2)
+    R²     = 1 - sum((yss .- (K .* uss .+ b)).^2) /
+                     sum((yss .- mean(yss)).^2)
+
+    println("Modelo lineal:  y = $(round(K,digits=4))·u + $(round(b,digits=4))")
+    println("R² = $(round(R², digits=5))")
+    # ───────────────────────────────────────────────────────────────────────
+
+
 
     # Datos experimentales
-    datos = scatter(uee, yee,
+    datos = scatter(uss, yss,
         label="Datos experimentales",
-        color="#d40055", marker=:circle, markersize=4, opacity=0.8)
+        color="#d40055", marker=:circle, markersize=4, linewidth=1.5)
 
     # Modelo lineal
-    leg_size = 10
-    mod_str = latexstring(@sprintf("y_{ee} = %.3f\\,u_{ee} + %0.2f\\, \\, (R^2 = %0.4f)", K, b, R²))
+    mod_str = @sprintf("%.2f uee + %0.2f  (R² = %0.2f)", K, b, R²)
     plot!(datos, collect(u_fit), y_fit,
         label = mod_str,
-        color="#0055d4", linewidth=1, legendfontsize = leg_size, linestyle=:dash)
+        color="#0055d4", linewidth=2, linestyle=:dash)
 
-    plt = plot(datos, size=(600,600),
-        title="Curva estática – ThermoLab",
-        xlabel="Potencia (%)",
+    plt = plot(datos,  size=(600,600), 
+        title="Curva estática – UNThermal",
+        xlabel="Potencia (% de 2.475 W)",
         ylabel="Temperatura estacionaria (°C)",
-        xlims=(0, maximum(uee) + 5), ylims=(min(20, b - 5), MAX_TEMPERATURE + 5),
+        xlims=(0, 60), ylims=(30, 100),
         background_color_subplot=:ivory,
         legend=:topleft, grid=true, gridalpha=0.2,
-        margin=2Plots.mm)
-    redraw!(plt)
-
-    save_experiment([uee, yee], "ThermoLab_static_gain_response.csv", "u,y")
-    save_experiment([[K], [b]], "ThermoLab_static_pars.csv", "K,b")
-
-    println("Modelo estático completo:  yee = $(round(K, digits=4))·uee + $(round(b, digits=3))  (R² = $(round(R², digits=5)))")
-    return uee, yee
+        xticks=0:10:100, yticks=20:10:100,
+        margin=3Plots.mm)
+    display(plt)
+    save_experiment([uss, yss], "ThermoLab_static_gain_response.csv", "u,y")
+    save_experiment([[K], [b]], "ThermoLab_static_pars.csv", "K,b")   
+    println("Curva estática completada con $(length(uss)) puntos")   
+    set_reference(sys, DEFAULT_REFERENCE);   
+    return uss, yss
 end
+
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -751,17 +947,17 @@ G2, L = get_model_prbs(sys; numpar=3, usefile=true);
 ```
 """
 function get_model_prbs(sys::ThermalSystem;
-                        yop::Real = 50.0, amplitude::Real = 4.0,
-                        divider::Int = 25, numpar::Int = 2, usefile::Bool = false)
+                        yop::Real = 50.0, amplitude::Real = 5.0,
+                        numpar::Int = 2, divider::Int = 25, usefile::Bool = false)
+    
     numpar in (2, 3) || error("numpar debe ser 2 o 3")
 
     if !usefile
         t, u, y = prbs_open(sys; yop=yop, amplitude=amplitude, divider=divider,
-                            stab_time=120, uee_time=10)
+                            stab_time=240, uee_time=10)
     else
         t, u, y = read_csv_file3(_datafile("ThermoLab_prbs_open_exp.csv"))
     end
-    t = t .- t[1]   # t=0 al inicio de la PRBS
 
     s = tf("s")
 
@@ -771,7 +967,10 @@ function get_model_prbs(sys::ThermalSystem;
         return ss(sis, balance=false)
     end
 
-    ymean_val = Float64(mean(y))
+
+    t = t .- t[1]   # t=0 al inicio de la PRBS
+    
+    ymean_val = mean(y)
 
     # removing means
     um = u .- mean(u)
@@ -796,7 +995,7 @@ function get_model_prbs(sys::ThermalSystem;
         save_experiment([[b], [a], [L]], "ThermoLab_fo_model_2p.csv", "b,a,L")
 
     else  # numpar == 3
-        p0 = [0.03, 0.5, 0.02]  # valores iniciales para [a1, a2, b]
+        p0 = [0.025, 0.05, 1.3]  # valores iniciales para [a1, a2, b]
         optim_model = structured_pem(data, 2; p0=p0, constructor=model2p)
         a1, a2, b = optim_model.res.minimizer.p
         a1, a2 = minmax(a1, a2)
@@ -805,7 +1004,6 @@ function get_model_prbs(sys::ThermalSystem;
         ysim = vec(res.y)
         r1 = modelfit(data.y', ysim)
         modelstr1 = latexstring(@sprintf("G(s) = \\frac{%.5f}{(s + %.4f)(s + %.4f)} \\quad (FIT=%.1f\\,\\%%)", b, a1, a2, r1[1]))
-
         save_experiment([[b], [a1], [a2], [L]], "ThermoLab_fo_model_3p.csv", "b,a1,a2,L")
     end
 
@@ -825,6 +1023,5 @@ function get_model_prbs(sys::ThermalSystem;
     plot!(plt, subplot=2, t, u,
           label="PRBS", color=:green, seriestype=:steppre)
     redraw!(plt)
-
     return G1, L
 end
