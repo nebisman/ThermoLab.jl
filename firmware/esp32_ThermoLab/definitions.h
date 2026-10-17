@@ -567,9 +567,11 @@ void onCommandReceived(char* lastTopic, byte* lastPayload){
  * Called by the ESP32 Arduino UART driver whenever new bytes land
  * in the hardware RX FIFO.  It simply wakes serialCommandTask via a
  * direct-to-task notification so no CPU time is spent polling.
+ * A frame longer than the RX FIFO threshold (120 bytes) triggers this
+ * callback more than once, so it must not act on the tasks itself:
+ * onCommandReceived() already suspends them when the command is parsed.
  * --------------------------------------------------------------- */
 static void onSerialReceive() {
-    suspendAllTasks();
     xTaskNotifyGive(h_serialCommandTask);
 }
 
@@ -583,6 +585,12 @@ static void serialCommandTask(void *pvParameters) {
     for (;;) {
         // Block with no timeout until the ISR gives a notification
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+        // Extra notifications of a frame already read: readBytesUntil would
+        // busy-wait for 2 s and starve publishStateTask, which runs on this core
+        if (Serial.available() == 0) {
+            continue;
+        }
 
         // Read topic line
         size_t topicLen = Serial.readBytesUntil('\n', topicBuf, sizeof(topicBuf) - 1);

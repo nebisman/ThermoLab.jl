@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════════════════════════════════════
-#  controlsys.jl – Funciones de control para el sistema ThermoLab via serial.
+#  controlsys.jl – Funciones de control para el sistema UNThermal.
 #  LB 2026 – MIT License
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -15,108 +15,60 @@ import ControlSystemsBase: stepinfo
 
 
 
+DEFAULT_REF = 40
+
 # ═══════════════════════════════════════════════════════════════════════════════
-#  set_reference
+#  set_reference!
 # ═══════════════════════════════════════════════════════════════════════════════
 
 """
-    set_reference(sys::ThermalSystem, ref_value::Real=40.0)
+    set_reference(sys, ref)
 
-Fija la referencia de temperatura de la plataforma ThermoLab al valor `ref_value` (en °C).
-El controlador activo (ver [`set_pid`](@ref) y [`set_controller`](@ref)) lleva la
-temperatura a ese valor.
-
-# Argumentos
-- `sys::ThermalSystem`: objeto que representa la plataforma.
-- `ref_value::Real=40.0`: temperatura de referencia, en °C. No debe superar
-  los 90 °C.
-
-# Retorna
-- `nothing`. Como efecto secundario, imprime en consola la referencia fijada.
-
-# Lanza
-- `ErrorException` si `ref_value` es mayor que 90 °C.
+Fija la referencia de temperatura [°C] en el sistema.
 
 # Ejemplo
 ```julia
-using ThermoLab
-sys = ThermalSystem();
-set_reference(sys, 50.0)
-
-    "Referencia fijada a 50.00 °C"
+set_reference!(sys, 50.0)
 ```
 """
-function set_reference(sys::ThermalSystem, ref_value::Real = DEFAULT_REFERENCE)
-    ref_value <= MAX_TEMPERATURE ||
-        error("La temperatura de referencia no debe superar $(MAX_TEMPERATURE) °C")
+function set_reference(sys::ThermalSystem, ref::Real)
     connect!(sys)
-    send_command!(sys, "set_ref", Dict("reference" => float2hex(ref_value)))
+    send_command!(sys, "set_ref", Dict("reference" => float2hex(Float64(ref))))
     disconnect!(sys)
-    println("Referencia fijada a $(@sprintf("%.2f", ref_value)) °C \n")
+    println("Referencia fijada en $(@sprintf("%.1f", ref)) °C")
     return nothing
 end
 
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
-#  set_pid
+#  set_pid!
 # ═══════════════════════════════════════════════════════════════════════════════
 
 """
-    set_pid(sys::ThermalSystem; kp=16.796, ki=2.0, kd=16.441, N=27.38, beta=0.1)
+    set_pid(sys; kp, ki, kd, N, beta)
 
-Esta función configura los cinco parámetros `kp`, `ki`, `kd`, `N` y `beta` de
-un controlador PID de 2-GDL (dos grados de libertad), como el mostrado en la siguiente figura:
+Configura el controlador PID con filtro derivativo y peso en la referencia.
+El algoritmo sigue Åström & Murray (Feedback Systems, 2nd ed.) con
+tiempo de muestreo h = 0.8 s.
 
-![Diagrama de bloques del controlador PID de dos grados de libertad](../../assets/pid2gdl.png)
-
-# Argumentos
-- `sys::ThermalSystem`: objeto que representa la plataforma ThermoLab.
-
-# Argumentos de palabra clave
-- `kp::Real=16.796`: ganancia proporcional del controlador PID.
-- `ki::Real=2.0`: ganancia integral del controlador PID.
-- `kd::Real=16.441`: ganancia derivativa del controlador PID.
-- `N::Real=27.38`: coeficiente del filtro del derivador.
-- `beta::Real=0.1`: ponderación del punto de ajuste (*setpoint weighting*)
-  del controlador PID.
-
-# Retorna
-- `nothing`, una vez que los parámetros del PID se han actualizado
-  correctamente. Imprime en consola los parámetros configurados.
-
-# Notas
-- Cuando `beta=1.0`, el PID resultante corresponde al PID estándar de un grado
-  de libertad (1-DOF) descrito en la mayoría de los libros de texto.
-- Esta implementación se basa en el algoritmo formulado en el libro [*Feedback
-  Systems: An Introduction for Scientists and Engineers*](https://fbswiki.org/wiki/index.php/PID_Control),
-  segunda edición, de Åström y Murray. El algoritmo usa un periodo de muestreo
-  del controlador de 0.8 segundos, apropiado para la plataforma ThermoLab, e
-  incluye un mecanismo *anti-windup* para la acción integral.
-- La potencia aplicada se satura entre 0 y 100 %.
-- Al cargar el controlador, la referencia vuelve al valor por defecto de 40 °C.
+# Parámetros
+- `kp`  : ganancia proporcional (default 16.796)
+- `ki`  : ganancia integral (default 2.0)
+- `kd`  : ganancia derivativa (default 16.441)
+- `N`   : coeficiente de filtro del derivativo (default 27.38)
+- `beta`: peso de setpoint, β=1 → PID 1-DOF estándar (default 0.1)
 
 # Ejemplo
-Primero, asegúrese de haber importado el paquete ThermoLab y de haber definido
-el sistema, así:
-
 ```julia
-using ThermoLab
-sys = ThermalSystem();
-```
-
-Luego, el controlador PID se programa así:
-
-```julia
-set_pid(sys; kp=11.8, ki=2.7, kd=0, N=10.0, beta=0.0)
-
-    "PID actualizado: kp=11.8  ki=2.7  kd=0  N=10.0  β=0.0"
+set_pid!(sys; kp=10.0, ki=1.5, kd=8.0, N=20.0, beta=0.5)
 ```
 """
 function set_pid(sys::ThermalSystem;
-                  kp::Real = 16.796, ki::Real = 2.0, kd::Real = 16.441,
-                  N::Real = 27.38, beta::Real = 0.1)
-
+                  kp::Real   = 10.0,
+                  ki::Real   = 2.32,
+                  kd::Real   = 0.0,
+                  N::Real    = 10.0,
+                  beta::Real = 0.0)
     payload = Dict(
         "kp"   => float2hex(kp),
         "ki"   => float2hex(ki),
@@ -125,107 +77,48 @@ function set_pid(sys::ThermalSystem;
         "beta" => float2hex(beta),
     )
     connect!(sys)
-    send_command!(sys, "set_pid", payload)
-    set_reference(sys, DEFAULT_REFERENCE)
+    send_command!(sys, "set_pid", payload)  
+    set_reference(sys, DEFAULT_REF);    
     println("PID actualizado: kp=$kp  ki=$ki  kd=$kd  N=$N  β=$beta")
     return nothing
 end
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  set_controller  (controlador general en espacio de estados)
+#  set_controller
 # ═══════════════════════════════════════════════════════════════════════════════
 
 """
-    set_controller(sys::ThermalSystem, controller)
+    set_controller(sys, controller)
 
-Programa un controlador en la plataforma ThermoLab. El controlador se define como una función de transferencia en el dominio de
-Laplace `s`, la cual es automáticamente discretizada.
+Carga un controlador general C(s) en el ESP32.
+Soporta controladores 1-DOF (SISO) y 2-DOF (1×2 matriz de transferencia).
 
-Esta función permite programar un controlador estándar de 1 grado de
-libertad (1-GDL), como el mostrado en la siguiente figura:
+El controlador se discretiza con transformada bilineal a h = SAMPLING_TIME.
+Se implementa anti-windup por observador (ganancia L calculada con LQR).
 
-![Controlador de 1 grado de libertad](../../assets/controller_1gdl.png)
-
-A su vez, esta misma función permite programar un controlador de 2
-grados de libertad, como se muestra a continuación:
-
-![Controlador de 2 grados de libertad](../../assets/controller_2gdl.png)
-
-# Argumentos
-- `sys::ThermalSystem`:  objeto que representa la plataforma ThermoLab.
-- `controller`: función de transferencia continua (`ControlSystems.TransferFunction`)
-  en el dominio de Laplace `s`.
-  - Si ``C`` es 1x1 (una entrada y una salida), se interpreta como controlador de 1 grado de
-    libertad:
-
-    ``u = C·(r - y)``
-
-  - Si  ``C=[C_1\\quad C_2]`` es una matriz 1×2 (dos entradas y una salida), se interpreta como controlador de 2 grados de
-    libertad:
-
-    ``u = C_1·r + C_2·y``
-
-    Con el controlador obtenido por [`cont2dof`](@ref), ``C_1=\\frac{L}{A}`` es la
-    primera columna y ``C_2=-\\frac{M}{A}`` es la segunda.
-
-# Retorna
-- `nothing`. Imprime un mensaje de confirmación en consola.
-
-# Notas
-- Esta función admite tanto controladores de 1-GDL como de 2-GDL, de orden
-  máximo 10.
-- El controlador se convierte a espacio de estados para su implementación
-  digital. Se discretiza usando el método bilineal (Tustin) con un periodo
-  de muestreo de 0.8 segundos.
-- Se implementa un mecanismo anti-windup basado en un observador, cuya
-  ganancia se calcula mediante el filtro de Kalman.
-- La potencia aplicada se satura entre 0 y 100 %.
-
-# Ejemplos
-## Ejemplo 1: controlador de  un grado de libertad (1-GDL)
-Supongamos que queremos implementar un controlador PI para la temperatura de la plataforma
-**ThermoLab**, definido por la siguiente función de transferencia:
-
-``C(s)=\\frac{11.8\\,s + 2.7}{s}``
-
-Para ello usamos el siguiente código:
-
+# Ejemplo 1-DOF
 ```julia
-using ThermoLab
-sys = ThermalSystem();
-s = tf("s");
-C = (11.8s + 2.7)/s;
-set_controller(sys, C)
-
-    "Controlador cargado en ThermoLab"
+s = tf("s")
+C = 10.0 + 2.0/s
+set_controller!(sys, C)
 ```
 
-## Ejemplo 2: controlador de dos grados de libertad (2-GDL)
-Supongamos que queremos implementar un controlador de 2-GDL diseñado con [`cont2dof`](@ref)
-para que la temperatura siga una respuesta de lazo cerrado de segundo orden `T`:
-
+# Ejemplo 2-DOF
 ```julia
-using ThermoLab
-sys = ThermalSystem();
-G = tf(sys)
-s = tf("s");
-ωn = 0.1; ζ = 0.8
-T = ωn^2/(s^2 + 2ζ*ωn*s + ωn^2)
-C = cont2dof(G, T, 1, [-0.3])
-set_controller(sys, C);
-
-    "Controlador cargado en ThermoLab"
+C = tf([[2, 1], [-6, -5]], [[1, 2, 1], [1, 2, 1]])
+set_controller!(sys, C)
 ```
 """
+
+
 function set_controller(sys::ThermalSystem, controller)
-    # Determinar si es 1 DOF o 2 DOF
-    ni = size(controller, 2)  # número de entradas
-    ni in (1, 2) || error("El controlador debe ser de 1 o 2 GDL (1×1 o 1×2)")
-    type_control = ni - 1     # 0: controlador de 1-GDL, 1: de 2-GDL
+    
+    h = SAMPLING_TIME
+    ni = size(controller, 2)
+    type_control  = ni - 1
 
-    # # ── Construir sistema continuo con 2 entradas [r, y] ────────────
-
+    
     sys_c = minreal(ss(controller))
 
     # ── Discretización bilineal (Tustin) ──────────────────────────────
@@ -233,11 +126,11 @@ function set_controller(sys::ThermalSystem, controller)
     sys_d, S, E = modal_form(sys_int)
     Ad, Bd, Cd, Dd = ssdata(sys_d)
     order = size(Ad, 1)
-    order <= 10 || error("El orden del controlador no debe superar 10")
     Q = 100000*diagm(ones(size(Ad,1)))
-
-
-    Lg = kalman(sys_d, Q,1)
+    
+    #Lg = lqr(Discrete, Ad',Cd',Q, 1)# xxx
+    #Lg = Lg'
+    Lg = kalman(sys_d, Q,1) 
 
     if ni == 1
        Bd =Matrix{Float64}( hcat(Bd, -Bd))
@@ -245,9 +138,11 @@ function set_controller(sys::ThermalSystem, controller)
     end
 
 
+    order = size(Ad, 1)
     Ac_fw = Ad - Lg * Cd
     Bc_fw = Bd - Lg * Dd
 
+ 
     payload = Dict(
         "order"       => long2hex(order),
         "A"           => matrix2hex(Ac_fw),
@@ -257,72 +152,12 @@ function set_controller(sys::ThermalSystem, controller)
         "L"           => matrix2hex(Lg),
         "typeControl" => long2hex(type_control),
     )
+
     connect!(sys)
     send_command!(sys, "set_gencon", payload)
-    sleep(0.1)
-    set_reference(sys, DEFAULT_REFERENCE)
-    println("Controlador cargado en ThermoLab ($ni-GDL, orden=$order)")
+    set_reference(sys, DEFAULT_REF); 
+    println("Controlador cargado en sistema térmico ($ni-DOF, orden=$order)")
     return nothing
-end
-
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Gráfica de lazo cerrado (compartida por step, stairs y profile)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-"""Figura base de dos paneles (temperatura y potencia) para lazo cerrado."""
-function _closed_loop_plot(title_str, xmax, ylim)
-    return plot(layout=(2, 1), size=(900, 500),
-        title=[title_str ""],
-        ylabel=["Temperatura (°C)" "Potencia (%)"],
-        xlabel=["" "Tiempo (s)"],
-        xlims=[(0, xmax) (0, xmax)],
-        ylims=[ylim (-5, 105)],
-        background_color_subplot=[:ivory :mintcream],
-        legend=[:topleft :topleft],
-        grid=true, gridalpha=0.15, margin=5Plots.mm)
-end
-
-"""Agrega a la figura las curvas r(t), y(t) y u(t) con sus valores actuales."""
-function _closed_loop_curves!(plt, tv, rv, yv, uv)
-    leg_size = 10
-    ref_str   = latexstring(@sprintf("r(t) = %.2f \\,\\, ^\\circ C", rv[end]))
-    temp_str  = latexstring(@sprintf("y(t) = %.2f \\,\\, ^\\circ C", yv[end]))
-    power_str = latexstring(@sprintf("u(t) = %.2f \\,\\, \\%%", uv[end]))
-    plot!(plt, subplot=1, tv, rv, label=ref_str, color=:teal,
-          seriestype=:steppost, legendfontsize=leg_size, fg_legend="#d4aa00",
-          linewidth=1.25)
-    plot!(plt, subplot=1, tv, yv, label=temp_str, color=:deeppink,
-          legendfontsize=leg_size, linewidth=1.5)
-    plot!(plt, subplot=2, tv, uv, label=power_str, color=:royalblue,
-          legendfontsize=leg_size, fg_legend="#5fbcd3", linewidth=1.5)
-    return plt
-end
-
-"""Recibe las muestras de un experimento en lazo cerrado y las grafica."""
-function _run_closed_loop!(sys, total, title_str, xmax, ylim)
-    h = SAMPLING_TIME
-    tv, rv, yv, uv = Float64[], Float64[], Float64[], Float64[]
-
-    on_sample = function(msg, np_val)
-        push!(tv, np_val * h)
-        push!(rv, hex2float(string(msg["r"])))
-        push!(yv, hex2float(string(msg["y"])))
-        push!(uv, hex2float(string(msg["u"])))
-
-        # Reconstruir gráfica desde cero para evitar trazas duplicadas
-        plt = _closed_loop_plot(title_str, xmax, ylim)
-        _closed_loop_curves!(plt, tv, rv, yv, uv)
-        redraw!(plt)
-    end
-
-    try
-        receive_samples!(sys, total, on_sample)
-    catch e
-        println("Error: ", e)
-    end
-    return tv, rv, yv, uv
 end
 
 
@@ -331,65 +166,24 @@ end
 # ═══════════════════════════════════════════════════════════════════════════════
 
 """
-    step_closed(sys::ThermalSystem; r0=40, r1=50, t0=60, t1=60)
+    step_closed(sys; r0, r1, t0, t1)
 
-Ejecuta un experimento de respuesta al escalón en lazo cerrado sobre la
-plataforma ThermoLab. El controlador que actúa sobre la plataforma ha sido previamente cargado con
-[`set_pid`](@ref) o [`set_controller`](@ref).
+Ejecuta un escalón en lazo cerrado: referencia pasa de `r0` a `r1` [°C].
+- `t0`: duración en el valor inicial [s] (default 60)
+- `t1`: duración en el valor final [s] (default 60)
 
-La referencia de temperatura inicia en un valor inicial `r0` y
-pasa a un valor final `r1`. La duración de cada nivel de referencia está
-definida por los tiempos `t0` y `t1`, respectivamente, como muestra la figura siguiente.
+Grafica en tiempo real y retorna `(t, r, y, u)`.
 
-![Respuesta al escalón en lazo cerrado de la plataforma ThermoLab](../../assets/step_closed.png)
-
-Los parámetros de la figura se describen a continuación.
-
-# Argumentos
-- `sys::ThermalSystem`: objeto que representa la plataforma ThermoLab, con un controlador previamente
-cargado.
-
-# Argumentos de palabra clave
-- `r0::Real=40`: valor inicial de la referencia, en °C.
-- `r1::Real=50`: valor final de la referencia tras el escalón, en °C.
-- `t0::Real=60`: duración en segundos de la referencia en el valor `r0`.
-- `t1::Real=60`: duración en segundos de la referencia en el valor `r1`.
-
-# Retorna
-- `(t, r, y, u)`: tupla de vectores `Vector{Float64}` con el tiempo [s], la
-  referencia [°C], la temperatura medida [°C] y la potencia aplicada [%], respectivamente.
-
-# Notas
-- Para obtener una respuesta al escalón limpia, la temperatura debe estar
-  estabilizada en `r0` antes del escalón; elija `t0` suficientemente largo.
-- La función genera una gráfica para visualizar la respuesta al escalón en
-  tiempo real, mostrando la temperatura y la potencia durante el
-  experimento.
-- Al terminar, la referencia vuelve al valor por defecto de 40 °C.
-- Los datos del experimento se guardan en un archivo CSV en
-  `datafiles/ThermoLab_step_closed_exp.csv` presente en el directorio de trabajo.
-
-# Ejemplos
-Primero, asegúrese de haber importado el paquete ThermoLab, de haber
-definido el sistema y de haber cargado un controlador, así:
-
+# Ejemplo
 ```julia
-using ThermoLab
-sys = ThermalSystem()
-set_pid(sys; kp=11.8, ki=2.7, kd=0, beta=0)
-```
-
-Luego, obtenga el experimento de respuesta al escalón en lazo cerrado, así:
-
-```julia
-t, r, y, u = step_closed(sys; r0=40, r1=50, t0=60, t1=120);
+t, r, y, u = step_closed(sys; r0=40, r1=55, t0=60, t1=120)
 ```
 """
 function step_closed(sys::ThermalSystem;
-                     r0::Real = 40.0, r1::Real = 50.0,
-                     t0::Real = 60.0, t1::Real = 60.0)
-    max(r0, r1) <= MAX_TEMPERATURE ||
-        error("Las referencias no deben superar $(MAX_TEMPERATURE) °C")
+                     r0::Real = 40.0,
+                     r1::Real = 50.0,
+                     t0::Real = 60.0,
+                     t1::Real = 60.0)
     h           = SAMPLING_TIME
     points_low  = round(Int, t0 / h)
     points_high = round(Int, t1 / h)
@@ -402,20 +196,75 @@ function step_closed(sys::ThermalSystem;
         "points_high" => long2hex(points_high),
     )
 
-    # Gráfica inicial
+    tv, rv, yv, uv = Float64[], Float64[], Float64[], Float64[]
     delta = abs(r1 - r0)
-    title_str = "Escalón en lazo cerrado  r0=$(@sprintf("%.1f",r0)) → r1=$(@sprintf("%.1f",r1)) °C"
-    xmax = (total - 1) * h
-    ylim = (min(r0, r1) - max(5, 0.5delta), max(r0, r1) + max(5, 0.5delta))
-    redraw!(_closed_loop_plot(title_str, xmax, ylim))
 
-    # Comunicación
+    plt = plot(layout=(2, 1), size=(900, 500),
+        title=["Respuesta al Escalón en lazo cerrado  r0=$(@sprintf("%.1f",r0)) → r1=$(@sprintf("%.1f",r1)) °C" ""],
+        ylabel=["Temperatura (°C)" "Potencia (%)"],
+        xlabel=["Tiempo (s)" "Tiempo (s)"],
+        xlims=[(0, (total-1)*h) (0, (total-1)*h)],
+        ylims=[(min(r0,r1) - max(5, 0.5*delta), max(r0,r1) + max(5, 0.5*delta)) (-5, 105)],
+        background_color_subplot=[:ivory :mintcream],
+        legend=[:bottomright :bottomright],
+        grid=true, gridalpha=0.25, margin=5Plots.mm)
+    redraw!(plt)
+
     connect!(sys)
     send_command!(sys, "step_closed", payload)
-    tv, rv, yv, uv = _run_closed_loop!(sys, total, title_str, xmax, ylim)
-    set_reference(sys, DEFAULT_REFERENCE)
 
-    save_experiment([tv, rv, yv, uv], "ThermoLab_step_closed_exp.csv", "t,r,y,u")
+    on_sample = function(msg, np_val)
+        t_curr = (np_val) * h
+        y_curr = hex2float(string(msg["y"]))
+        u_curr = hex2float(string(msg["u"]))
+        r_curr = hex2float(string(msg["r"]))
+        push!(tv, t_curr); push!(yv, y_curr)
+        push!(uv, u_curr); push!(rv, r_curr)
+
+        plt = plot(layout=(2, 1), size=(900, 500),
+            title=["Respuesta al Escalón en lazo cerrado  r0=$(@sprintf("%.1f",r0)) → r1=$(@sprintf("%.1f",r1)) °C" ""],
+            ylabel=["Temperatura (°C)" "Potencia (%)"],
+            xlabel=["" "Tiempo (s)"],
+            xlims=[(0, (total-1)*h) (0, (total-1)*h)],
+            ylims=[(min(r0,r1) - max(5, 0.5*delta), max(r0,r1) + max(5, 0.5*delta)) (-5, 105)],
+            background_color_subplot=[:ivory :mintcream],
+            legend=[:topleft :topleft],
+            grid=true, gridalpha=0.15, margin=5Plots.mm)
+        
+        
+        #legends y plots
+        leg_size = 11
+        ref_str = latexstring(@sprintf("r(t) = %.2f \\,\\, ^\\circ  C", r_curr))
+        temp_str = latexstring(@sprintf("y(t) = %.2f \\,\\, ^\\circ  C", y_curr))
+        power_str = latexstring(@sprintf("u(t) = %.2f  \\,\\, \\%% ", u_curr))
+        
+        plot!(plt, subplot=1, tv, rv, label= ref_str, color=:teal,  seriestype=:steppost,
+              legendfontsize = leg_size, fg_legend = "#d4aa00", linewidth=1.25)
+        
+        plot!(plt, subplot=1, tv, yv, label =temp_str, color=:deeppink, 
+             legendfontsize = leg_size, linewidth=1.5)
+        
+        plot!(plt, subplot=2, tv, uv, label=power_str,
+              legendfontsize = leg_size, fg_legend= "#5fbcd3", color=:royalblue, linewidth=1.5)
+        
+        #annotate!(plt, t90 - 0.4*si.risetime, lv90, text("90%", 7, :purple))
+     
+        #plot!(t[i10:i90], y[i10:i90], color = "#800033", label ="")
+        
+        redraw!(plt)
+    end
+
+    try
+        receive_samples!(sys, total, on_sample; timeout=5.0)
+    catch e
+        println("Error: ", e)
+    end
+    
+    set_reference(sys, DEFAULT_REFERENCE);  
+    save_experiment([tv, rv, yv, uv], "ThermoLab_step_open_exp.csv", "t,u,y")
+   
+
+    
     return tv, rv, yv, uv
 end
 
@@ -425,87 +274,81 @@ end
 # ═══════════════════════════════════════════════════════════════════════════════
 
 """
-    stairs_closed(sys; stairs=[40, 50, 60], duration=120)
+    stairs_closed(sys; stairs, duration)
 
-Ejecuta  un experimento de seguimiento de una señal de referencia tipo "escalera" sobre la
-plataforma ThermoLab. La referencia de temperatura toma sucesivamente cada uno de los
-valores de los escalones definidos por el usuario (en `stairs`), con una duración establecida en la variable `duration`,
-como se muestra en la figura siguiente:
+Ejecuta una señal en escalera en lazo cerrado.
+- `stairs`  : vector/tupla de temperaturas de referencia [°C]
+- `duration`: duración de cada escalón [s] (default 60)
 
-
-![Señal de referencia tipo escalera para stairs_closed](../../assets/stairs_response.png)
-
-Los parámetros mostrados en la figura se describen a continuación:
-
-# Argumentos
-- `sys::ThermalSystem`: objeto que representa la plataforma.
-
-# Argumentos de palabra clave
-- `stairs`: colección con los escalones sucesivos de temperatura de referencia
-  deseada, en °C (máximo 50 escalones).
-- `duration::Real=120`: duración en segundos de cada escalón de la escalera.
-
-# Retorna
-- `(t, r, y, u)`: tupla de vectores con el tiempo (s), la
-  referencia (°C), la temperatura medida (°C) y la potencia aplicada (%).
-
-# Notas
-- El controlador que actúa sobre la plataforma en este experimento ha sido previamente cargado con
-[`set_pid`](@ref) o [`set_controller`](@ref).
-- Se genera una gráfica para visualizar la respuesta a la señal de
-  referencia en tiempo real, mostrando la temperatura y la potencia
-  durante el experimento.
-- Los datos del experimento se guardan en un archivo CSV en
-  `datafiles/ThermoLab_stairs_closed_exp.csv` que está presente en el
-  directorio de trabajo.
+Grafica en tiempo real y retorna `(t, r, y, u)`.
 
 # Ejemplo
-Primero, asegúrese de haber importado el paquete ThermoLab, de haber
-definido el sistema y de haber cargado un controlador, así:
-
 ```julia
-using ThermoLab
-sys = ThermalSystem();
-set_pid(sys; kp=11.8, ki=2.7, kd=0, beta=0)
-```
-
-Luego, ejecute el experimento de obtención de la respuesta en lazo cerrado a una señal de referencia tipo escalera, así:
-
-```julia
-stairs_closed(sys; stairs=[40, 50, 60, 45], duration=120)
+t, r, y, u = stairs_closed(sys; stairs=(40, 50, 55, 45), duration=60)
 ```
 """
 function stairs_closed(sys::ThermalSystem;
-                       stairs = [40, 50, 60],
-                       duration::Real = 120.0)
+                       stairs   = (40, 50, 55),
+                       duration::Real = 60.0)
     h        = SAMPLING_TIME
     stairs_v = collect(Float64, stairs)
-    length(stairs_v) <= 50 || error("stairs admite a lo sumo 50 escalones")
     dur_pts  = ceil(Int, duration / h)
     total    = length(stairs_v) * dur_pts
     mn, mx   = minimum(stairs_v), maximum(stairs_v)
-    mx <= MAX_TEMPERATURE ||
-        error("Las referencias no deben superar $(MAX_TEMPERATURE) °C")
+    span     = mx - mn
 
     payload = Dict(
-        "signal"        => signal2hex(stairs_v),
+        "signal"        => join(float2hex(v) for v in stairs_v),
         "duration"      => long2hex(dur_pts),
         "points_stairs" => long2hex(length(stairs_v)),
         "min_val"       => float2hex(mn),
         "max_val"       => float2hex(mx),
     )
 
-    span = mx - mn
-    title_str = "Escaleras con $(length(stairs_v)) niveles, duración $(@sprintf("%.0f",total*h)) s"
-    xmax = (total - 1) * h
-    ylim = (mn - max(3, 0.1span), mx + max(3, 0.1span))
-    redraw!(_closed_loop_plot(title_str, xmax, ylim))
+    tv, rv, yv, uv = Float64[], Float64[], Float64[], Float64[]
+
+    plt = plot(layout=(2, 1), size=(900, 500),
+        title=["Escaleras $(length(stairs_v)) niveles, duración $(@sprintf("%.0f",total*h)) s" ""],
+        ylabel=["Temperatura (°C)" "Potencia (%)"],
+        xlabel=["Tiempo (s)" "Tiempo (s)"],
+        xlims=[(0, (total-1)*h) (0, (total-1)*h)],
+        ylims=[(mn - max(3, 0.1*span), mx + max(3, 0.1*span)) (-5, 105)],
+        background_color_subplot=[:ivory :mintcream],
+        legend=:topright, grid=true, gridalpha=0.15, margin=5Plots.mm)
+    redraw!(plt)
 
     connect!(sys)
     send_command!(sys, "stairs_closed", payload)
-    tv, rv, yv, uv = _run_closed_loop!(sys, total, title_str, xmax, ylim)
-    set_reference(sys, DEFAULT_REFERENCE)
 
+    on_sample = function(msg, np_val)
+        t_curr = np_val * h
+        y_curr = hex2float(string(msg["y"]))
+        u_curr = hex2float(string(msg["u"]))
+        r_curr = hex2float(string(msg["r"]))
+        push!(tv, t_curr); push!(yv, y_curr)
+        push!(uv, u_curr); push!(rv, r_curr)
+
+        plt = plot(layout=(2, 1), size=(900, 500),
+            title=["Escaleras $(length(stairs_v)) niveles, duración $(@sprintf("%.0f",total*h)) s" ""],
+            ylabel=["Temperatura (°C)" "Potencia (%)"],
+            xlabel=["Tiempo (s)" "Tiempo (s)"],
+            xlims=[(0, (total-1)*h) (0, (total-1)*h)],
+            ylims=[(mn - max(3, 0.1*span), mx + max(3, 0.1*span)) (-5, 105)],
+            background_color_subplot=[:ivory :mintcream],
+            legend=:topright, grid=true, gridalpha=0.15, margin=5Plots.mm)
+        plot!(plt, subplot=1, tv, rv, label="r(t)", color=:darkgreen, linewidth=1.1)
+        plot!(plt, subplot=1, tv, yv, label="y(t)", color=:deeppink,  linewidth=1.25)
+        plot!(plt, subplot=2, tv, uv, label="u(t)", color=:royalblue)
+        redraw!(plt)
+    end
+
+    try
+        receive_samples!(sys, total, on_sample; timeout=5.0)
+    catch e
+        println("Error: ", e)
+    end
+
+    set_reference(sys, DEFAULT_REFERENCE);  
     save_experiment([tv, rv, yv, uv], "ThermoLab_stairs_closed_exp.csv", "t,r,y,u")
     return tv, rv, yv, uv
 end
@@ -516,77 +359,37 @@ end
 # ═══════════════════════════════════════════════════════════════════════════════
 
 """
-    profile_closed(sys; timevalues=[0, 120, 240, 360], refvalues=[40, 55, 55, 40])
+    profile_closed(sys; timevalues, refvalues)
 
-Ejecuta en lazo cerrado un perfil de referencia arbitrario sobre la
-plataforma ThermoLab. La señal de referencia se define como una serie de
-instantes de tiempo `t1`, `t2`,...`ti`, a los cuales corresponden, respectivamente,
-los valores de temperatura de referencia `r1`, `r2`,...`ri`. Entre dos instantes
-consecutivos la referencia se interpola linealmente, como se ilustra a continuación:
+Ejecuta un perfil de referencia interpolado en lazo cerrado.
+- `timevalues`: vector de tiempos [s]
+- `refvalues` : vector de temperaturas de referencia [°C]
 
-
-![Perfil de referencia definido por puntos para profile_closed](../../assets/profile_response.png)
-
-Los parámetros de la función son los siguientes:
-
-# Argumentos
-- `sys::ThermalSystem`: objeto que representa la plataforma.
-
-# Argumentos de palabra clave
-- `timevalues`: colección con los instantes de tiempo (con valores crecientes
-  en segundos) que definen el perfil. El primer punto de `timevalues` debe ser `0`.
-- `refvalues`: colección, de la misma longitud que `timevalues`, con los valores
-  de temperatura de referencia (°C) en cada instante.
-
-# Retorna
-- `(t, r, y, u)`: tupla de vectores con el tiempo (s), la
-  referencia interpolada (°C), la temperatura medida (°C) y la potencia aplicada (%).
-
-# Notas
-- El controlador que actúa sobre la plataforma en este experimento ha sido previamente cargado con
-[`set_pid`](@ref) o [`set_controller`](@ref).
-- Se genera una gráfica para visualizar la respuesta al perfil de referencia en tiempo
-  real, mostrando la temperatura y la potencia durante el experimento.
-- Los datos del experimento se guardan en un archivo CSV en
-  `datafiles/ThermoLab_profile_closed_exp.csv` que está presente en el directorio de trabajo.
-
+Grafica en tiempo real y retorna `(t, r, y, u)`.
 
 # Ejemplo
-Primero, asegúrese de haber importado el paquete ThermoLab, de haber
-definido el sistema y de haber cargado un controlador, así:
-
 ```julia
-using ThermoLab
-sys = ThermalSystem();
-set_pid(sys; kp=11.8, ki=2.7, kd=0, beta=0)
-```
-
-Luego, ejecute el experimento de obtención de la respuesta en lazo cerrado a un perfil de referencia, así:
-
-```julia
-profile_closed(sys; timevalues=[0, 120, 240, 360, 480], refvalues=[40, 40, 55, 55, 40])
+t, r, y, u = profile_closed(sys;
+    timevalues = (0, 120, 240, 360, 480),
+    refvalues  = (40, 40, 55, 55, 40))
 ```
 """
 function profile_closed(sys::ThermalSystem;
-                        timevalues = [0, 120, 240, 360],
-                        refvalues  = [40, 55, 55, 40])
+                        timevalues = [0.0, 45, 90, 135.0],
+                        refvalues  = [40.0, 55.0, 45.0, 50.0])
     h      = SAMPLING_TIME
     tv_cmd = collect(Float64, timevalues)
     rv_cmd = collect(Float64, refvalues)
-    length(tv_cmd) == length(rv_cmd) ||
-        error("timevalues y refvalues deben tener la misma longitud")
-    maximum(rv_cmd) <= MAX_TEMPERATURE ||
-        error("Las referencias no deben superar $(MAX_TEMPERATURE) °C")
 
     int_tv = [round(Int, p / h) for p in tv_cmd]
     if int_tv[1] != 0
         int_tv = vcat([0, int_tv[1] - 1], int_tv)
         rv_cmd = vcat([rv_cmd[1], rv_cmd[1]], rv_cmd)
     end
-    length(int_tv) <= 50 || error("El perfil admite a lo sumo 50 puntos")
 
     mn, mx = minimum(rv_cmd), maximum(rv_cmd)
     total  = int_tv[end] + 1
+    span   = mx - mn
 
     payload = Dict(
         "timevalues" => time2hex(int_tv),
@@ -595,21 +398,56 @@ function profile_closed(sys::ThermalSystem;
         "min_val"    => float2hex(mn),
         "max_val"    => float2hex(mx),
     )
+    print(payload)
+    tv, rv, yv, uv = Float64[], Float64[], Float64[], Float64[]
 
-    span = mx - mn
-    title_str = "Perfil duración=$(@sprintf("%.0f",tv_cmd[end])) s, $(length(tv_cmd)) puntos"
-    xmax = (total - 1) * h
-    ylim = (mn - max(3, 0.1span), mx + max(3, 0.1span))
-    redraw!(_closed_loop_plot(title_str, xmax, ylim))
+    plt = plot(layout=(2, 1), size=(900, 500),
+        title=["Perfil duración=$(@sprintf("%.0f",tv_cmd[end])) s, $(length(tv_cmd)) puntos" ""],
+        ylabel=["Temperatura (°C)" "Potencia (%)"],
+        xlabel=["Tiempo (s)" "Tiempo (s)"],
+        xlims=[(0, (total-1)*h) (0, (total-1)*h)],
+        ylims=[(mn - max(3, 0.1*span), mx + max(3, 0.1*span)) (-5, 105)],
+        background_color_subplot=[:ivory :mintcream],
+        legend=:topright, grid=true, gridalpha=0.15, margin=5Plots.mm)
+    redraw!(plt)
 
     connect!(sys)
     send_command!(sys, "prof_closed", payload)
-    tv, rv, yv, uv = _run_closed_loop!(sys, total, title_str, xmax, ylim)
-    set_reference(sys, DEFAULT_REFERENCE)
 
+    on_sample = function(msg, np_val)
+        t_curr = np_val * h
+        y_curr = hex2float(string(msg["y"]))
+        u_curr = hex2float(string(msg["u"]))
+        r_curr = hex2float(string(msg["r"]))
+        push!(tv, t_curr); push!(yv, y_curr)
+        push!(uv, u_curr); push!(rv, r_curr)
+
+        plt = plot(layout=(2, 1), size=(900, 500),
+            title=["Perfil duración=$(@sprintf("%.0f",tv_cmd[end])) s, $(length(tv_cmd)) puntos" ""],
+            ylabel=["Temperatura (°C)" "Potencia (%)"],
+            xlabel=["Tiempo (s)" "Tiempo (s)"],
+            xlims=[(0, (total-1)*h) (0, (total-1)*h)],
+            ylims=[(mn - max(3, 0.1*span), mx + max(3, 0.1*span)) (-5, 105)],
+            background_color_subplot=[:ivory :mintcream],
+            legend=:topright, grid=true, gridalpha=0.15, margin=5Plots.mm)
+        plot!(plt, subplot=1, tv, rv, label="r(t)", color=:darkgreen, linewidth=1.25)
+        plot!(plt, subplot=1, tv, yv, label="y(t)", color=:deeppink,  linewidth=1.0)
+        plot!(plt, subplot=2, tv, uv, label="u(t)", color=:royalblue, linewidth=1.0)
+        redraw!(plt)
+    end
+
+    try
+        receive_samples!(sys, total, on_sample; timeout=5.0)
+    catch e
+        println("Error: ", e)
+    end
+
+    set_reference(sys, DEFAULT_REFERENCE); 
     save_experiment([tv, rv, yv, uv], "ThermoLab_profile_closed_exp.csv", "t,r,y,u")
     return tv, rv, yv, uv
 end
+
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -633,70 +471,14 @@ struct StepInfoSR
     risetime::Float64
     settling_th::Float64
     risetime_th::Tuple{Float64, Float64}
-    u_max::Float64          #  maximo de  la señal de control
+    u_max::Float64          #  maximo de  la señal de control 
 end
 
 
 
-"""
-    stepinfo(res, T=nothing; settling_th=0.02, risetime_th=(0.1, 0.9))
-
-Calcula métricas de la respuesta al escalón a partir de datos experimentales
-en lazo cerrado, y grafica la respuesta medida (con las métricas anotadas)
-junto con, opcionalmente, la respuesta simulada con un modelo de lazo cerrado nominal `T`.
 
 
-# Argumentos
-- `res`: tupla `(t, r, y, u)` con los vectores de tiempo, referencia, temperatura
-  medida y potencia aplicada, tal y como los retorna [`step_closed`](@ref).
 
-# Argumentos de palabra clave
-- `T=nothing`: función de transferencia del modelo de lazo cerrado; cuando se suministra, su
-  respuesta al escalón se superpone en la gráfica experimental para comparar.
-- `settling_th::Real=0.02`: umbral, como fracción del tamaño del escalón,
-  de la banda usada para el cálculo del tiempo de estabilización (por defecto, 2 %).
-- `risetime_th::Tuple{Real,Real}=(0.1, 0.9)`: niveles, como fracción del
-  tamaño del escalón, usados para el tiempo de subida (por defecto, entre
-  10 % y 90 %).
-
-# Retorna
-- `info::StepInfoSR`: estructura con las métricas calculadas: valores
-  inicial y final (`y0`, `yf`), tamaño del escalón (`stepsize`), pico y
-  tiempo de pico (`peak`, `peaktime`), sobrepico en % (`overshoot`),
-  subpico y subpico en % (`lowerpeak`, `undershoot`), tiempo de
-  estabilización (`settlingtime`), tiempo de subida (`risetime`), los
-  umbrales usados (`settling_th`, `risetime_th`) y el máximo de la potencia
-  aplicada (`u_max`).
-
-# Ejemplo
-Primero, asegúrese de haber importado el paquete ThermoLab, de haber
-definido el sistema y de haber cargado un controlador, así:
-
-```julia
-using ThermoLab
-sys = ThermalSystem();
-set_pid(sys; kp=11.8, ki=2.7, kd=0, beta=0)
-```
-
-Luego obtenga la respuesta al escalón y use stepinfo
-
-```julia
-result = step_closed(sys; r0=40, r1=50, t0=60, t1=120);
-info = stepinfo(result)
-
-    Info Resp. Escalón:
-      Valor inicial:       40.013
-      Valor final:         49.981
-      Cambio escalón:      10.000
-      Pico:                50.312
-      Tiempo pico:          6.400 s
-      Sobrepico:             3.31 %
-      T. estabilización:   28.000 s
-      T. subida:            3.188 s
-      Max. |u(t)|:         94.795 %
-```
-
-"""
 function stepinfo(res, T = nothing;  settling_th = 0.02, risetime_th = (0.1, 0.9))
 
     t1, r1, y1, u1 = res[1], res[2], res[3], res[4]

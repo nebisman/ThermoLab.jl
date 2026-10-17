@@ -77,6 +77,6 @@ export step_open, prbs_open
 export get_static_model, get_model_step, get_model_prbs
 
 # Funciones de diseño de controladores (control_design)
-export cont2dof, cont1dof, lqmodel
+export cont2dof, cont1dof, lqmodel, itaemodel
 
 end # module ThermoLab

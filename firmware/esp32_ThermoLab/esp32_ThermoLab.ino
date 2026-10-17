@@ -159,11 +159,7 @@ static void controlPidTask(void *pvParameters) {
            Serial.printf("Referencia = %0.2f  ---->   Temperatura = %0.2f\n",reference,y);
         #endif
 
-        // This is a firmware protection in case of sensor failure or overtemperature.
-        if (y <= 0 || y >= 100) {
-            wattsToPlant(0);
-            continue;
-        }
+
         bi = ki*h;
         ad = kd/(N*(kd/N + h));
         bd = kd/(kd/N + h);
@@ -173,8 +169,18 @@ static void controlPidTask(void *pvParameters) {
            IA = IA + bi *(reference - y) + br*(usat - u);  // updating integral action
         } 
         u = PA + IA + DA;// + uN ; // control signal
-        usat =  constrain(u, 0, 100); //señal de control saturada
-        wattsToPlant(usat); // Enviar señal de control en bits
+        
+      
+
+        // This is a firmware protection in case of sensor failure or overtemperature.
+        if (y <= 0 || y >= 100) {
+            usat =  0; //señal de control saturada
+            wattsToPlant(usat);           
+        }
+        else {
+            usat =  constrain(u, 0, 100); //señal de control saturada
+            wattsToPlant(usat); // Enviar señal de control en bits
+        }
         y_ant = y;   
         sensors.requestTemperatures();
         xTaskDelayUntil(&xLastWakeTime, taskPeriod);
@@ -204,12 +210,7 @@ static void generalControlTask(void *pvParameters) {
         y = sensors.getTempCByIndex(0);  
         computeReference();  
 
-        //This is to protect the system in case of sensor failure or overtemperature.
 
-        if (y <= 0 || y >= 100) {
-            wattsToPlant(0);
-
-        }
 
         if (typeControl == GENERAL_CONTROLLER_1P){
             u = computeController(false);
@@ -218,6 +219,17 @@ static void generalControlTask(void *pvParameters) {
             u = computeController( true);
         }
         usat = constrain(u, 0, 100);
+
+
+        // This is a firmware protection in case of sensor failure or overtemperature.
+        if (y <= 0 || y >= 100) {
+            usat =  0; //señal de control saturada
+            wattsToPlant(usat);           
+        }
+        else {
+            usat =  constrain(u, 0, 100); //señal de control saturada
+            wattsToPlant(usat); // Enviar señal de control en bits
+        }
         wattsToPlant( usat);           
         sensors.requestTemperatures();
         xTaskDelayUntil(&xLastWakeTime, taskPeriod);

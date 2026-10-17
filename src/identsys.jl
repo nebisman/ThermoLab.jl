@@ -320,7 +320,7 @@ function prbs_open(sys::ThermalSystem;
         ylims=[(ymin, ymax) (umin, umax)],
         background_color_subplot=[:ivory :mintcream],
         legend=:bottomright, grid=true, gridalpha=0.15, margin=5Plots.mm)
-    display(plt)
+    redraw!(plt)
 
     payload = Dict(
         "peak_amp" => float2hex(amplitude),
@@ -622,7 +622,7 @@ function get_static_model(sys::ThermalSystem;
         legend=:topleft, grid=true, gridalpha=0.2,
         xticks=0:10:100, yticks=20:10:100,
         margin=3Plots.mm)
-    display(plt)
+    redraw!(plt)
     save_experiment([uss, yss], "ThermoLab_static_gain_response.csv", "u,y")
     save_experiment([[K], [b]], "ThermoLab_static_pars.csv", "K,b")   
     println("Curva estática completada con $(length(uss)) puntos")   

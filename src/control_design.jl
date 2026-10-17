@@ -404,3 +404,96 @@ function lqmodel(G, q)
 
     return T, Gur
 end
+
+
+
+# Coeficientes normalizados del denominador (ω₀ = 1), de s^n a s^0.
+const ITAE_POSICION = Dict(
+    1 => [1, 1],
+    2 => [1, 1.4, 1],
+    3 => [1, 1.75, 2.15, 1],
+    4 => [1, 2.1, 3.4, 2.7, 1],
+    5 => [1, 2.8, 5.0, 5.5, 3.4, 1],
+    6 => [1, 3.25, 6.6, 8.6, 7.45, 3.95, 1],
+)
+
+const ITAE_VELOCIDAD = Dict(
+    2 => [1, 3.2, 1],
+    3 => [1, 1.75, 3.25, 1],
+    4 => [1, 2.41, 4.93, 5.14, 1],
+    5 => [1, 2.19, 6.5, 6.3, 5.24, 1],
+    6 => [1, 6.12, 13.42, 17.16, 14.14, 6.76, 1],
+)
+
+
+"""
+    itaemodel(order=3, omega=1.0; type=:pos)
+
+Calcula la respuesta de lazo cerrado de orden `order` que minimiza el índice
+``ITAE = \\int_0^\\infty t\\,|e(t)|\\,dt``, con frecuencia ``\\omega_0`` = `omega`.
+
+# Argumentos
+- `order::Int=3`: Orden ``n`` de la función de transferencia. Con `type=:pos`
+  admite de 1 a 6; con `type=:speed`, de 2 a 6.
+- `omega::Real=1.0`: Frecuencia ``\\omega_0`` (rad/s) de la respuesta.
+
+# Argumentos de palabra clave
+- `type::Symbol=:pos`: Tipo de respuesta ITAE.
+  + `:pos`: cero error de posición (sigue escalones sin error):
+    ``T(s) = \\dfrac{\\omega_0^n}{D(s)}``
+  + `:speed`: cero error de velocidad (sigue rampas sin error):
+    ``T(s) = \\dfrac{a_1\\,\\omega_0^{n-1} s + \\omega_0^n}{D(s)}``
+
+  donde ``D(s) = s^n + a_{n-1}\\,\\omega_0\\, s^{n-1} + \\cdots + a_1\\,\\omega_0^{n-1}\\, s + \\omega_0^n``.
+
+# Retorna
+- `T`: Función de transferencia de lazo cerrado candidata, esto es, ``T(s)=\\frac{Y(s)}{R(s)}``.
+
+# Notas
+- El parámetro `omega` cambia la velocidad de la respuesta pero no su forma: un
+  valor mayor produce una respuesta más rápida a costa de un mayor esfuerzo de
+  control.
+- `itaemodel` no diseña un controlador por sí sola: retorna un modelo de lazo
+  cerrado `T`, el cual debe pasarse luego a [`cont2dof`](@ref) para obtener el
+  controlador que lo realiza.
+
+# Ejemplo
+Primero, asegúrese de haber importado el paquete DCMotor, de haber
+definido el sistema y de haber obtenido un modelo nominal de la planta,
+así:
+
+```julia
+using DCMotor
+sys = MotorSystem();
+G_ang = tf(sys, output=:angle, numpar=3)
+```
+
+Luego, calcule la respuesta de lazo cerrado ITAE y diseñe el controlador
+de 2-GDL que la realiza:
+
+```julia
+w = 20
+T = itaemodel(3, w; type=:pos)
+C = cont2dof(G_ang, T, 2, [-4*w, -4*w])
+
+# ahora probamos la respuesta del controlador
+set_controller(sys, C; output=:angle)
+result = step_closed(sys; r0 = 0, r1 = 90,  t0 = 0.5, t1 = 2);
+stepinfo(result, T)
+```
+"""
+function itaemodel(order::Int = 3, omega::Real = 1.0; type=:pos)
+    tabla = type == :pos ? ITAE_POSICION :
+            type == :speed ? ITAE_VELOCIDAD :
+            error("type debe ser :pos (posición) o :speed (velocidad)")
+    haskey(tabla, order) ||
+        error("order debe estar entre $(minimum(keys(tabla))) y $(maximum(keys(tabla))) para type=$(repr(type))")
+    omega > 0 || error("omega debe ser positiva")
+
+    n = order
+    # el coeficiente de s^(n-k) se multiplica por ω₀^k
+    den = tabla[n] .* omega .^ (0:n)
+    num = type == :pos ? [omega^n] :
+                        den[end-1:end]   # mismos dos últimos coeficientes que D(s) -> e₁ = 0
+    return tf(num, den)
+end

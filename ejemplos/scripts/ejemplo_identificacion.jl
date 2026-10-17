@@ -24,7 +24,7 @@ G, L = get_model_step(sys; t1=600, usefile=true)
 G, L = get_model_prbs(sys; yop=50, numpar=3)
 
 ##  6. Con los mismos datos PRBS podemos estimar un modelo de dos polos
-G2, L = get_model_prbs(sys; numpar=3, usefile=true)
+G2, L = get_model_prbs(sys; numpar=2, usefile=true)
 
 ## 7. Podemos estimar los parámetros de la planta por respuesta a una señal PRBS
 prbs_open(sys;  yop = 50.0,  divider=2)

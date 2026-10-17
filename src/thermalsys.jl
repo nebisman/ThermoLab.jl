@@ -445,28 +445,27 @@ end
 
 Bloquea hasta recibir `total_points` muestras. A diferencia de DCMotor (que
 envía tramas de varias muestras), el firmware de ThermoLab envía **una muestra
-por periodo de muestreo**, numerada con el campo `np`. Las muestras se
-sincronizan a partir de `np == 0` y se invoca `on_sample(msg, np)` por cada
-una. Lanza `ErrorException` si pasan más de `timeout` segundos sin datos.
+por periodo de muestreo**, numerada con el campo `np`, que el firmware
+reinicia en 0 al iniciar cada experimento. Se invoca `on_sample(msg, np)` por
+cada muestra hasta recibir la de `np == total_points - 1`. Lanza
+`ErrorException` si pasan más de `timeout` segundos sin datos.
+
 """
 function receive_samples!(sys::ThermalSystem, total_points::Int, on_sample::Function;
                           timeout::Float64 = 5.0)
-    sync     = false
-    received = 0
-
-    while received < total_points
+    sync = false
+    while true
         msg = _wait_sample(sys, timeout)
         np_val = hex2long(string(msg["np"]))
-        if np_val == 0
-            sync = true
-        end
-        if sync
-            on_sample(msg, np_val)
-            received += 1
-        end
+        sync = sync || np_val == 0
+        sync || continue
+        on_sample(msg, np_val)
+        np_val >= total_points - 1 && break
     end
     return nothing
 end
+
+
 
 function _wait_sample(sys::ThermalSystem, timeout::Float64)
     deadline = time() + timeout
