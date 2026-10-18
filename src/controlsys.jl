@@ -398,7 +398,7 @@ function profile_closed(sys::ThermalSystem;
         "min_val"    => float2hex(mn),
         "max_val"    => float2hex(mx),
     )
-    print(payload)
+    
     tv, rv, yv, uv = Float64[], Float64[], Float64[], Float64[]
 
     plt = plot(layout=(2, 1), size=(900, 500),

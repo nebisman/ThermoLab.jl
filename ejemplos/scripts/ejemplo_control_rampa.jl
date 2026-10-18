@@ -17,10 +17,10 @@ C = cont2dof(G, T, 2, [-5*ω₀])
 
 # respuesta del controlador
 set_controller(sys, C)
-profile_closed(sys; timevalues = [0.0, 30, 60, 90.0, 120.0, 150],
-                        refvalues  = [40.0, 50.0, 80.0, 60.0, 40, 50])
+profile_closed(sys; timevalues = [0.0, 30, 60, 90.0, 120.0, 150, 180],
+                        refvalues  = [40.0, 50.0, 80.0, 60.0, 40, 50, 60])
 
 
 
-stairs_closed(sys; stairs   = ( 50, 55,60),
-                       duration= 30.0)
+#tairs_closed(sys; stairs   = ( 50, 55,60),
+           #            duration= 30.0)

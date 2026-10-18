@@ -577,8 +577,8 @@ static void onSerialReceive() {
 
 
 static void serialCommandTask(void *pvParameters) {
-    static char topicBuf[216];
-    static char payloadBuf[1024];
+    static char topicBuf[256];
+    static char payloadBuf[2048];
 
     // Register the ISR callback now that the task handle is valid   
 
