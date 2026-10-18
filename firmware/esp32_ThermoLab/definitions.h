@@ -5,7 +5,6 @@
 
 
 #include <stdlib.h>
-#include <ESP32Encoder.h>
 #include <ArduinoJson.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -366,7 +365,7 @@ void defaultControl(){
 
 
 void onCommandReceived(char* lastTopic, byte* lastPayload){
-    suspendAllTasks();
+    //suspendAllTasks();
     JsonDocument doc;
     if (strstr(lastTopic, USER_SYS_SET_PID)){
         typeControl = PID_CONTROLLER;
@@ -572,13 +571,14 @@ void onCommandReceived(char* lastTopic, byte* lastPayload){
  * onCommandReceived() already suspends them when the command is parsed.
  * --------------------------------------------------------------- */
 static void onSerialReceive() {
+    suspendAllTasks();
     xTaskNotifyGive(h_serialCommandTask);
 }
 
 
 static void serialCommandTask(void *pvParameters) {
-    static char topicBuf[128];
-    static char payloadBuf[2048];
+    static char topicBuf[216];
+    static char payloadBuf[1024];
 
     // Register the ISR callback now that the task handle is valid   
 

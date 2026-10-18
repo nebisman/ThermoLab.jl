@@ -17,8 +17,8 @@ C = cont2dof(G, T, 2, [-5*ω₀])
 
 # respuesta del controlador
 set_controller(sys, C)
-profile_closed(sys; timevalues = [0.0, 45, 90],
-                        refvalues  = [40.0, 55.0, 75.0])
+profile_closed(sys; timevalues = [0.0, 30, 60, 90.0, 120.0, 150],
+                        refvalues  = [40.0, 50.0, 80.0, 60.0, 40, 50])
 
 
 
