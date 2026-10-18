@@ -11,8 +11,8 @@ completa, sin transmitir los bytes de relleno.
 Generado automáticamente por GitHub Actions
 (.github/workflows/build-firmware.yml) a partir de
 firmware/esp32_ThermoLab:
-  Commit fuente:     48d10c27e9915291ea93ad7408a8acbac6cf6e70
-  Fecha de build:    2026-10-10
+  Commit fuente:     3e8ebba0560670ca3e5a2e8a28525af1b01eb0c0
+  Fecha de build:    2026-10-18
   FQBN:              esp32:esp32:esp32s3usbotg
   arduino-cli:       1.5.1
   Core esp32:esp32:  3.3.12 (instalado; índice disponible 3.3.12)
