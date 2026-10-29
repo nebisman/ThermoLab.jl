@@ -10,24 +10,27 @@ using Polynomials
 """
     cont2dof(G, T, m, polesobs=[])
 
-Calcula, mediante un método lineal algebraico,  un controlador de dos grados de libertad (2-GDL)
+Calcula, mediante un método lineal algebraico, un controlador de dos grados de libertad (2-GDL)
 que hace que la respuesta de lazo cerrado de la planta `G` coincida con la
 función de transferencia deseada `T`.
 
 # Argumentos
-- `G`: Función de transferencia de la planta.
-- `T`: Función de transferencia de lazo cerrado deseada.
-- `m::Int`: Orden del controlador. Debe ser al menos `n-1`, donde `n` es el
-  orden de la planta `G`.
-- `polesobs::Vector=[]`: polos adicionales del observador implícito en el
-  prefiltro.
+- `G`: Función de transferencia de la planta, de orden `n`.
+- `T`: Función de transferencia de lazo cerrado deseada. El algoritmo trabaja
+  con ``T(s)/N(s)``, donde ``N(s)`` es el numerador de `G`; si `T` no contiene
+  los ceros de `G`, el controlador los cancela (solo es válido si son estables).
+- `m::Int`: Orden del controlador. Debe ser al menos `n-1`.
+- `polesobs::Vector=[]`: polos del observador implícito, que se cancelan en la
+  respuesta de la referencia a la salida. Su número debe ser
+  `n + m - gr(T/N)`, con `gr(T/N)` el grado del denominador de ``T(s)/N(s)``.
 
 # Retorna
-- `C`: matriz  de transferencia del controlador, definida como: 
+- `C`: matriz de transferencia 1×2 del controlador, definida como:
 
- ``C(s) = \\begin{bmatrix} \\dfrac{L(s)}{A(s)} & -\\dfrac{M(s)}{A(s)} \\end{bmatrix}``. 
- 
- La señal  de control es ``u = \\frac{L}{A} r − \\frac{M}{A}y``.
+  ``C(s) = \\begin{bmatrix} \\dfrac{L(s)}{A(s)} & -\\dfrac{M(s)}{A(s)} \\end{bmatrix}``
+
+  La señal de control es ``u = \\frac{L}{A} r - \\frac{M}{A}y``. Este
+  controlador se carga directamente en la plataforma con [`set_controller`](@ref).
 
 # Lanza
 - `ErrorException` si `m < n-1` (el orden del controlador es menor que el
@@ -37,9 +40,10 @@ función de transferencia deseada `T`.
   polos hacen falta.
 
 # Notas
-
-- Si selecciona un orden del controlador tal que `m > n-1`, el algoritmo coloca automaticamente acción integral
-en el controlador diseñado.
+- Si selecciona un orden del controlador tal que `m > n-1`, el algoritmo
+  intenta colocar automáticamente acción integral (``A(0) = 0``) en el
+  controlador diseñado.
+- Las funciones [`lqmodel`](@ref) e [`itaemodel`](@ref) ayudan a escoger `T`.
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab, de haber
@@ -182,25 +186,25 @@ end
 """
     cont1dof(G, poles)
 
-Calcula,  mediante el método lineal algebraico,  un controlador 1-GDL de realimentación
+Calcula, mediante el método lineal algebraico, un controlador 1-GDL de realimentación
 unitaria que ubica los polos de lazo cerrado, según los polos indicados por el vector `poles`.
 
 # Argumentos
-- `G`: Función de transferencia de la planta.
-- `poles::Vector`: Polos deseados de lazo cerrado del sistema.
+- `G`: Función de transferencia de la planta, de orden `n`.
+- `poles::Vector`: Polos deseados de lazo cerrado del sistema. Su número
+  determina el orden del controlador: `m = length(poles) - n`.
 
 # Retorna
-- `C`: función de transferencia del controlador.
+- `C`: función de transferencia del controlador, con ``u = C\\,(r - y)``. Se
+  carga en la plataforma con [`set_controller`](@ref).
 
 # Lanza
 - `ErrorException` si `poles` no tiene al menos `2n-1` elementos (con `n` el
   orden de `G`), es decir, si el orden  del controlador resulta menor que `n - 1`.
 
 # Notas
-- Si selecciona un orden del controlador tal que `m > n-1`, el algoritmo coloca automaticamente acción integral
-en el controlador diseñado.
-
-
+- Si `length(poles) ≥ 2n` (es decir, `m > n-1`), el algoritmo intenta colocar
+  automáticamente acción integral en el controlador diseñado.
 
 # Ejemplo
 
@@ -310,24 +314,33 @@ end
     lqmodel(G, q)
 
 Calcula, por factorización espectral, la respuesta de lazo cerrado óptima
-LQ  para la planta `G`, con peso `q` sobre la señal de control.
+LQ para la planta `G`, que minimiza el índice cuadrático
+
+``J = \\int_0^\\infty \\left( q\\,e^2(t) + \\tilde u^2(t) \\right) dt``
+
+donde ``e = r - y`` es el error de seguimiento y ``\\tilde u`` la desviación de
+la señal de control respecto a su valor final. Los polos de `T` son las raíces
+estables de ``D(s)D(-s) + q\\,N(s)N(-s)``, con ``G = N/D``.
 
 # Argumentos
 - `G`: Función de transferencia de la planta.
-- `q::Real`: Peso de la señal de control en el índice cuadrático.
+- `q::Real`: Peso del error de seguimiento en el índice cuadrático (relativo al
+  peso unitario de la señal de control).
 
 # Retorna
-- `T`: Función de transferencia de lazo cerrado, esto es, ``T(s)=\\frac{Y(s)}{R(s)}``.
+- `T`: Función de transferencia de lazo cerrado, esto es, ``T(s)=\\frac{Y(s)}{R(s)}``,
+  con los mismos ceros de `G` y ganancia estática unitaria.
 - `Gur`: Función de transferencia de referencia a señal de control (`u = Gur·r`).
 
 # Notas
-- Un valor de `q` mayor penaliza más la señal de control, produciendo una
-  respuesta de lazo cerrado `T` más lenta pero con menor esfuerzo de
-  control; un valor de `q` menor produce una respuesta más rápida a costa
-  de un mayor esfuerzo de control.
+- Un valor de `q` mayor penaliza más el error, produciendo una respuesta de
+  lazo cerrado `T` más rápida a costa de un mayor esfuerzo de control; un
+  valor de `q` menor produce una respuesta más lenta pero con menor esfuerzo
+  de control. `Gur` permite revisar ese esfuerzo (por ejemplo, con
+  `step(Gur)`) antes de probar el controlador.
 - `lqmodel` no diseña un controlador por sí sola: retorna un modelo de lazo
-  lazo cerrado óptimo `T`, la cual debe pasarse luego a [`cont2dof`](@ref)
-  para obtener el controlador que la realiza.
+  cerrado óptimo `T`, el cual debe pasarse luego a [`cont2dof`](@ref)
+  para obtener el controlador que lo realiza.
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab, de haber
@@ -429,8 +442,9 @@ const ITAE_VELOCIDAD = Dict(
 """
     itaemodel(order=3, omega=1.0; type=:pos)
 
-Calcula la respuesta de lazo cerrado de orden `order` que minimiza el índice
-``ITAE = \\int_0^\\infty t\\,|e(t)|\\,dt``, con frecuencia ``\\omega_0`` = `omega`.
+Calcula la función de transferencia de lazo cerrado de orden `order` que
+minimiza el índice ``ITAE = \\int_0^\\infty t\\,|e(t)|\\,dt``, con frecuencia
+``\\omega_0`` = `omega`, a partir de los coeficientes normalizados de tabla.
 
 # Argumentos
 - `order::Int=3`: Orden ``n`` de la función de transferencia. Con `type=:pos`
@@ -449,6 +463,10 @@ Calcula la respuesta de lazo cerrado de orden `order` que minimiza el índice
 # Retorna
 - `T`: Función de transferencia de lazo cerrado candidata, esto es, ``T(s)=\\frac{Y(s)}{R(s)}``.
 
+# Lanza
+- `ErrorException` si `type` no es `:pos` ni `:speed`, si `order` está fuera
+  del intervalo admitido para ese `type`, o si `omega` no es positiva.
+
 # Notas
 - El parámetro `omega` cambia la velocidad de la respuesta pero no su forma: un
   valor mayor produce una respuesta más rápida a costa de un mayor esfuerzo de
@@ -458,28 +476,37 @@ Calcula la respuesta de lazo cerrado de orden `order` que minimiza el índice
   controlador que lo realiza.
 
 # Ejemplo
-Primero, asegúrese de haber importado el paquete DCMotor, de haber
-definido el sistema y de haber obtenido un modelo nominal de la planta,
-así:
+Primero, asegúrese de haber importado el paquete ThermoLab, de haber
+definido el sistema y de haber obtenido un modelo nominal de dos polos de la
+planta con [`get_model_prbs`](@ref) (`numpar=3`), así:
 
 ```julia
-using DCMotor
-sys = MotorSystem();
-G_ang = tf(sys, output=:angle, numpar=3)
+using ThermoLab
+sys = ThermalSystem();
+G = tf(sys; numpar=3)
 ```
 
 Luego, calcule la respuesta de lazo cerrado ITAE y diseñe el controlador
 de 2-GDL que la realiza:
 
 ```julia
-w = 20
-T = itaemodel(3, w; type=:pos)
-C = cont2dof(G_ang, T, 2, [-4*w, -4*w])
+ω₀ = 0.8
+T = itaemodel(3, ω₀; type=:pos)
+C = cont2dof(G, T, 2, [-5*ω₀])
 
 # ahora probamos la respuesta del controlador
-set_controller(sys, C; output=:angle)
-result = step_closed(sys; r0 = 0, r1 = 90,  t0 = 0.5, t1 = 2);
+set_controller(sys, C)
+result = step_closed(sys; r0 = 40, r1 = 50,  t0 = 30, t1 = 30);
 stepinfo(result, T)
+```
+
+Para seguir rampas sin error (por ejemplo, con [`profile_closed`](@ref)) use
+`type=:speed`:
+
+```julia
+T = itaemodel(3, 0.6; type=:speed)
+C = cont2dof(G, T, 2, [-3.0])
+set_controller(sys, C)
 ```
 """
 function itaemodel(order::Int = 3, omega::Real = 1.0; type=:pos)

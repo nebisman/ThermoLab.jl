@@ -98,39 +98,83 @@ end
 #  que coincide con la representación big-endian usada por Python struct.pack('>f').
 # ═══════════════════════════════════════════════════════════════════════════════
 
-"""Convierte Float32 a string hexadecimal de 8 caracteres (bit-pattern IEEE-754)."""
+"""
+    float2hex(value::Real) -> String
+
+Convierte `value` a `Float32` y retorna su patrón de bits IEEE-754 como un
+string hexadecimal de 8 caracteres (formato usado por el firmware).
+
+# Ejemplo
+```julia
+float2hex(1.0)
+
+    "3f800000"
+```
+"""
 function float2hex(value::Real)::String
     u = reinterpret(UInt32, Float32(value))
     return string(u; base=16, pad=8)
 end
 
-"""Convierte string hexadecimal de 8 caracteres a Float64 (bit-pattern IEEE-754)."""
+"""
+    hex2float(h::AbstractString) -> Float64
+
+Interpreta el string hexadecimal de 8 caracteres `h` como el patrón de bits
+IEEE-754 de un `Float32` y lo retorna como `Float64`. Es la inversa de
+[`float2hex`](@ref).
+"""
 function hex2float(h::AbstractString)::Float64
     u = parse(UInt32, h; base=16)
     return Float64(reinterpret(Float32, u))
 end
 
-"""Convierte UInt32 a string hexadecimal de 8 caracteres."""
+"""
+    long2hex(value::Integer) -> String
+
+Convierte `value` a `UInt32` y lo retorna como un string hexadecimal de 8
+caracteres. Lanza `InexactError` si `value` no cabe en un `UInt32`.
+"""
 function long2hex(value::Integer)::String
     return string(UInt32(value); base=16, pad=8)
 end
 
-"""Convierte string hexadecimal de 8 caracteres a Int."""
+"""
+    hex2long(h::AbstractString) -> Int
+
+Interpreta el string hexadecimal `h` como un `UInt32` y lo retorna como `Int`.
+Es la inversa de [`long2hex`](@ref).
+"""
 function hex2long(h::AbstractString)::Int
     return Int(parse(UInt32, h; base=16))
 end
 
-"""Convierte un vector de floats a un string hex concatenado."""
+"""
+    signal2hex(signal) -> String
+
+Concatena, sin separadores, la representación [`float2hex`](@ref) de cada
+elemento de `signal`.
+"""
 function signal2hex(signal)::String
     return join(float2hex(v) for v in signal)
 end
 
-"""Convierte un vector de enteros (puntos de tiempo) a string hex concatenado."""
+"""
+    time2hex(time_points) -> String
+
+Concatena, sin separadores, la representación [`long2hex`](@ref) de cada
+elemento de `time_points` (índices de muestra enteros).
+"""
 function time2hex(time_points)::String
     return join(long2hex(Int(t)) for t in time_points)
 end
 
-"""Convierte una matriz (2D array) a string hex fila por fila."""
+"""
+    matrix2hex(mat) -> String
+
+Concatena, sin separadores, la representación [`float2hex`](@ref) de los
+elementos de `mat`, recorriéndola fila por fila. Si `mat` es un vector, se
+recorre en orden.
+"""
 function matrix2hex(mat)::String
     if ndims(mat) == 1
         return join(float2hex(e) for e in mat)
@@ -139,7 +183,12 @@ function matrix2hex(mat)::String
     end
 end
 
-"""Convierte un string hex separado por comas a un vector de Float64."""
+"""
+    hexframe_to_array(hexframe::AbstractString) -> Vector{Float64}
+
+Convierte un string de valores hexadecimales separados por comas (cada uno
+con el formato de [`float2hex`](@ref)) en un vector de `Float64`.
+"""
 function hexframe_to_array(hexframe::AbstractString)::Vector{Float64}
     return [hex2float(strip(p)) for p in split(hexframe, ",")]
 end
@@ -149,19 +198,31 @@ end
 #  Lectura de archivos CSV
 # ═══════════════════════════════════════════════════════════════════════════════
 
-"""Lee archivo CSV de 2 columnas (u, y). Retorna (u, y)."""
+"""
+    read_csv_file(filepath=datafiles/ThermoLab_static_gain_response.csv) -> (u, y)
+
+Lee un archivo CSV con encabezado y retorna sus dos primeras columnas como
+vectores `Float64`. Por defecto lee la curva estática guardada por
+[`get_static_model`](@ref) (potencia `u` en % y temperatura `y` en °C).
+"""
 function read_csv_file(filepath::String = _datafile("ThermoLab_static_gain_response.csv"))
     data = readdlm(filepath, ','; header=true)[1]
     return Float64.(data[:, 1]), Float64.(data[:, 2])
 end
 
-"""Lee archivo CSV de 3 columnas (t, u, y). Retorna (t, u, y)."""
+"""
+    read_csv_file3(filepath::String) -> (t, u, y)
+
+Lee un archivo CSV con encabezado y retorna sus tres primeras columnas como
+vectores `Float64`; por ejemplo, los archivos `t,u,y` guardados por
+[`step_open`](@ref) y [`prbs_open`](@ref).
+"""
 function read_csv_file3(filepath::String)
     data = readdlm(filepath, ','; header=true)[1]
     return Float64.(data[:, 1]), Float64.(data[:, 2]), Float64.(data[:, 3])
 end
 
-"""Lee la primera fila de un archivo CSV de parámetros. Retorna un vector."""
+"""Lee la primera fila de datos (tras el encabezado) de un CSV de parámetros. Retorna un vector."""
 function read_model(filepath::String)
     data = readdlm(filepath, ','; header=true)[1]
     return Float64.(data[1, :])
@@ -181,6 +242,7 @@ identificación del paquete reciben una instancia de `ThermalSystem` como primer
 argumento.
 
 
+
 # Argumentos de palabra clave
 - `port::String=find_port()`: nombre del puerto serial al que está
   conectada la placa ESP32 (por ejemplo: `"/dev/ttyUSB0"` en Linux, o  `"COM3"`
@@ -191,9 +253,11 @@ argumento.
   debe coincidir con la configurada en el firmware. Deje este valor por defecto
   a menos que se haya tenido que modificar la velocidad en el firmware.
 
-# Ejemplo
+# Ejemplos
 ```julia
-sys = ThermalSystem();
+using ThermoLab
+sys = ThermalSystem();                      # puerto detectado automáticamente
+sys = ThermalSystem(port="/dev/ttyUSB0");   # puerto indicado manualmente
 set_pid(sys; kp=11.8, ki=2.7, kd=0, beta=0)
 set_reference(sys, 50)
 ```
@@ -312,7 +376,16 @@ function find_port()
     return candidates[1]
 end
 
-"""Abre el puerto serial e inicia la tarea lectora."""
+"""
+    connect!(sys::ThermalSystem)
+
+Abre el puerto serial de `sys` (si no está abierto), descarta los bytes
+pendientes en el buffer de entrada e inicia la tarea que lee en segundo plano
+las muestras enviadas por el firmware.
+
+Normalmente no es necesario llamarla: las funciones de control e
+identificación la invocan por sí mismas.
+"""
 function connect!(sys::ThermalSystem)
     if sys.sp === nothing
         sys.sp = LibSerialPort.open(sys.port, sys.bauds)
@@ -323,7 +396,12 @@ function connect!(sys::ThermalSystem)
     return nothing
 end
 
-"""Detiene la tarea lectora y cierra el puerto serial."""
+"""
+    disconnect!(sys::ThermalSystem)
+
+Detiene la tarea lectora en segundo plano (esperando hasta 3 s a que
+termine) y cierra el puerto serial de `sys`, si está abierto.
+"""
 function disconnect!(sys::ThermalSystem)
     _stop_reader!(sys)
     if sys.sp !== nothing
@@ -427,9 +505,20 @@ end
 # ── Envío de comandos ────────────────────────────────────────────────────────
 
 """
-    send_command!(sys, topic_key, payload)
+    send_command!(sys::ThermalSystem, topic_key::String, payload::Dict)
 
-Envía `topic\\npayload_json\\n` al firmware (protocolo serialCommandTask).
+Envía un comando al firmware con el protocolo de la tarea `serialCommandTask`:
+una línea con el tópico y otra con `payload` serializado como JSON
+(`topic\\npayload_json\\n`). El puerto debe estar abierto (ver
+[`connect!`](@ref)).
+
+# Argumentos
+- `sys::ThermalSystem`: objeto que representa la plataforma.
+- `topic_key::String`: clave del tópico en `sys.topics`: `"set_pid"`,
+  `"set_ref"`, `"set_gencon"`, `"step_closed"`, `"stairs_closed"`,
+  `"prof_closed"`, `"step_open"` o `"prbs_open"`.
+- `payload::Dict`: parámetros del comando. Los valores reales y enteros se
+  envían codificados con [`float2hex`](@ref) y [`long2hex`](@ref).
 """
 function send_command!(sys::ThermalSystem, topic_key::String, payload::Dict)
     topic = sys.topics[topic_key]
@@ -441,15 +530,27 @@ end
 # ── Recepción síncrona de muestras ───────────────────────────────────────────
 
 """
-    receive_samples!(sys, total_points, on_sample; timeout=5.0)
+    receive_samples!(sys::ThermalSystem, total_points::Int, on_sample::Function; timeout=5.0)
 
-Bloquea hasta recibir `total_points` muestras. A diferencia de DCMotor (que
-envía tramas de varias muestras), el firmware de ThermoLab envía **una muestra
-por periodo de muestreo**, numerada con el campo `np`, que el firmware
-reinicia en 0 al iniciar cada experimento. Se invoca `on_sample(msg, np)` por
-cada muestra hasta recibir la de `np == total_points - 1`. Lanza
-`ErrorException` si pasan más de `timeout` segundos sin datos.
+Bloquea hasta recibir `total_points` muestras del experimento en curso. El
+firmware envía **una muestra por periodo de muestreo**, numerada con el campo
+`np`, que reinicia en 0 al iniciar cada experimento. Las muestras anteriores a
+la de `np == 0` (restos del experimento previo) se descartan; a partir de ella
+se invoca `on_sample(msg, np)` por cada muestra, hasta recibir la de
+`np == total_points - 1`.
 
+# Argumentos
+- `sys::ThermalSystem`: objeto conectado (ver [`connect!`](@ref)).
+- `total_points::Int`: número de muestras del experimento.
+- `on_sample::Function`: función `on_sample(msg, np)` que recibe el mensaje
+  como `Dict{String,Any}` (campos codificados en hexadecimal, p. ej. `"y"`,
+  `"u"` y `"r"`; ver [`hex2float`](@ref)) y el número de muestra `np::Int`.
+
+# Argumentos de palabra clave
+- `timeout::Float64=5.0`: tiempo máximo, en segundos, de espera entre muestras.
+
+# Lanza
+- `ErrorException` si pasan más de `timeout` segundos sin recibir datos.
 """
 function receive_samples!(sys::ThermalSystem, total_points::Int, on_sample::Function;
                           timeout::Float64 = 5.0)
@@ -647,7 +748,7 @@ el cual debe haber sido previamente ajustado al correr [`get_static_model`](@ref
     ``0 \\leq`` `power` ``\\leq  100``.
 
 # Retorna
-- `yee::Float64`: temperatura estacionaria estimada (en °C) que se produce al aplicar
+- `Float64`: temperatura estacionaria estimada (en °C) que se produce al aplicar
   la potencia especificada en la variable `power`.
 
 # Lanza
@@ -659,8 +760,10 @@ using ThermoLab
 sys = ThermalSystem();
 temp_from_power(sys, 20.0)
 
-    54.75
+    49.89
 ```
+
+El valor depende del modelo estático guardado en la carpeta `datafiles`.
 """
 function temp_from_power(sys::ThermalSystem, power::Real)
     0 <= power <= 100 || error("power debe estar en [0, 100] %")
@@ -682,13 +785,14 @@ inversa de [`temp_from_power`](@ref) y usa el mismo modelo estático lineal obte
 - `sys::ThermalSystem`: objeto que representa la plataforma
 - `temp::Real`: temperatura de estado estacionario especificada (en °C). Debe cumplir que
 
-   ``b \\leq`` `temp` ``\\leq 90\\,°C``
+   ``b \\leq`` `temp` ``\\leq 90\\,°C`` (`MAX_TEMPERATURE`)
 
    donde ``b`` es la temperatura estimada sin potencia aplicada (temperatura ambiente).
 
 # Retorna
-- `uee::Float64`: potencia estimada (en %) requerida para alcanzar la temperatura
-  de estado estacionario definida en la variable `temp`.
+- `Float64`: potencia estimada (en %) requerida para alcanzar la temperatura
+  de estado estacionario definida en la variable `temp`, saturada al
+  intervalo ``[0, 100]``.
 
 # Lanza
 - `ErrorException` si `temp` está fuera del intervalo indicado.
@@ -699,8 +803,10 @@ using ThermoLab
 sys = ThermalSystem();
 power_from_temp(sys, 50.0)
 
-    16.0
+    20.09
 ```
+
+El valor depende del modelo estático guardado en la carpeta `datafiles`.
 """
 function power_from_temp(sys::ThermalSystem, temp::Real)
     K, b = read_model(_datafile("ThermoLab_static_pars.csv"))
@@ -713,7 +819,10 @@ end
 
 # ── Guardar experimentos ─────────────────────────────────────────────────────
 
-"""Guarda las columnas como CSV en PATH_DATA/datafiles."""
+"""
+Guarda los vectores de `data` como columnas de un CSV `filename` en
+PATH_DATA/datafiles, con la línea de encabezado `header` y 8 decimales.
+"""
 function save_experiment(data::Vector, filename::String, header::String)
     mat = hcat(data...)
     open(_datafile(filename), "w") do io

@@ -37,7 +37,7 @@ end
 # ═══════════════════════════════════════════════════════════════════════════════
 
 """
-    step_open(sys::ThermalSystem; yop=50, amplitude=10, t1=600, stab_time=60, uee_time=10)
+    step_open(sys::ThermalSystem; yop=50, amplitude=10, t1=360, stab_time=50, uee_time=10)
 
 Configura y ejecuta un experimento para observar la respuesta de la
 temperatura de la plataforma **ThermoLab** ante un escalón de potencia aplicado en
@@ -61,14 +61,15 @@ Los parámetros mostrados en la figura se describen a continuación.
 # Argumentos de palabra clave
 - `yop::Real=50`: temperatura del punto de operación, en °C.
 - `amplitude::Real=10`: amplitud del escalón de potencia, en %.
-- `t1::Real=600`: duración en segundos del escalón.
-- `stab_time::Real=60`: duración en segundos de la fase de estabilización.
+- `t1::Real=360`: duración en segundos del escalón.
+- `stab_time::Real=50`: duración en segundos de la fase de estabilización.
 - `uee_time::Real=10`: duración en segundos de la fase de retención.
 
 # Retorna
 - `(t, u, y)`: tupla de vectores `Vector{Float64}` con el tiempo (s), la
   potencia aplicada (%) y la temperatura medida (°C), desde el inicio de la
-  fase de retención. El tiempo `t = 0` corresponde al instante del escalón.
+  fase de retención. El tiempo `t` se mide desde el inicio del experimento
+  (incluida la fase de estabilización).
 
 # Notas
 - Se usa típicamente para identificar el modelo dinámico de la plataforma
@@ -77,7 +78,15 @@ Los parámetros mostrados en la figura se describen a continuación.
   [`get_static_model`](@ref) y [`power_from_temp`](@ref)) solo para verificar que el
   escalón no exceda el intervalo [0, 100] % y para escalar la gráfica.
 - Los datos del experimento se guardan en un archivo CSV en
-  `datafiles/ThermoLab_step_open_exp.csv`.
+  `datafiles/ThermoLab_step_open_exp.csv`. En ese archivo el tiempo está
+  desplazado para que `t = 0` corresponda al instante del escalón.
+- Al terminar, la referencia se fija en 40 °C y se reactiva el controlador
+  cargado en la plataforma.
+
+# Lanza
+- `ErrorException` si `yop` está fuera del intervalo admitido por
+  [`power_from_temp`](@ref), o si la potencia de operación estimada más
+  `amplitude` supera el 100 %.
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab y de haber
@@ -141,7 +150,7 @@ function step_open(sys::ThermalSystem;
         xlims=[(0, t_total) (0, t_total)],
         ylims=[(ymin, ymax) (umin, umax)],
         background_color_subplot=[:ivory :mintcream],
-        legend=:bottomright, grid=true, gridalpha=0.15, margin=5Plots.mm)
+        legend=:best, grid=true, gridalpha=0.15, margin=5Plots.mm)
     redraw!(plt)
 
     connect!(sys)    
@@ -160,11 +169,11 @@ function step_open(sys::ThermalSystem;
             xlims=[(0, t_total) (0, t_total)],
             ylims=[(ymin, ymax) (0, 100)],
             background_color_subplot=[:ivory :mintcream],
-            legend=[:topleft :bottomright], grid=true, gridalpha=0.15, margin=5Plots.mm)
+            legend=:best, grid=true, gridalpha=0.15, margin=5Plots.mm)
 
-        leg_size = 9
-        temp_str = @sprintf("y(t) = %.2f °C", y_curr)
-        power_str =  @sprintf("u(t) = %.2f %% (de 2.475 W)", u_curr)
+        leg_size = 10
+        temp_str = latexstring(@sprintf("y(t) = %.2f \\,\\, ^\\circ  C", y_curr))
+        power_str = latexstring(@sprintf("u(t) = %.2f  \\,\\, \\%% ", u_curr))
 
         if np_val <= stab_pts         
        
@@ -223,7 +232,7 @@ end
 # ═══════════════════════════════════════════════════════════════════════════════
 
 """
-    prbs_open(sys::ThermalSystem; yop=50, amplitude=4, stab_time=60, uee_time=10, divider=25)
+    prbs_open(sys::ThermalSystem; yop=50, amplitude=5, stab_time=90, uee_time=10, divider=25)
 
 Configura y ejecuta un experimento de identificación en lazo abierto,
 excitando la plataforma **ThermoLab** con una señal binaria pseudoaleatoria (PRBS)
@@ -244,8 +253,8 @@ Los parámetros de esta función son:
 
 # Argumentos de palabra clave
 - `yop::Real=50`: temperatura del punto de operación, en °C.
-- `amplitude::Real=4`: amplitud pico de la señal PRBS, en % de potencia.
-- `stab_time::Real=60`: duración en segundos de la fase de estabilización.
+- `amplitude::Real=5`: amplitud pico de la señal PRBS, en % de potencia.
+- `stab_time::Real=90`: duración en segundos de la fase de estabilización.
 - `uee_time::Real=10`: duración en segundos de la fase de retención.
 - `divider::Int=25`: número de periodos de muestreo durante los cuales se
   mantiene cada bit de la secuencia PRBS (a mayor valor en `divider`, se aplica una señal más
@@ -259,7 +268,8 @@ Los parámetros de esta función son:
 # Retorna
 - `(t, u, y)`: tupla de vectores `Vector{Float64}` con el tiempo (s), la
   potencia aplicada (%) y la temperatura medida (°C) durante la señal PRBS. El
-  tiempo `t = 0` corresponde al inicio de la PRBS.
+  tiempo `t` se mide desde el inicio del experimento (incluidas las fases de
+  estabilización y retención), igual que en el archivo CSV guardado.
 
 # Notas
 
@@ -269,6 +279,13 @@ Los parámetros de esta función son:
   del paquete [ControlSystemIdentification.jl](https://github.com/baggepinnen/ControlSystemIdentification.jl).
 - Los datos del experimento se guardan en un archivo CSV en
   `datafiles/ThermoLab_prbs_open_exp.csv`.
+- Al terminar, la referencia se fija en 40 °C y se reactiva el controlador
+  cargado en la plataforma.
+
+# Lanza
+- `ErrorException` si `yop` está fuera del intervalo admitido por
+  [`power_from_temp`](@ref), o si la potencia de operación estimada más
+  `amplitude` supera el 100 %.
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab y de haber
@@ -319,7 +336,7 @@ function prbs_open(sys::ThermalSystem;
         xlims=[(0, total_time) (0, total_time)],
         ylims=[(ymin, ymax) (umin, umax)],
         background_color_subplot=[:ivory :mintcream],
-        legend=:bottomright, grid=true, gridalpha=0.15, margin=5Plots.mm)
+        legend=:best, grid=true, gridalpha=0.15, margin=5Plots.mm)
     redraw!(plt)
 
     payload = Dict(
@@ -347,11 +364,11 @@ function prbs_open(sys::ThermalSystem;
             xlims=[(0, total_time) (0, total_time)],
             ylims=[(ymin, ymax) (umin, umax)],
             background_color_subplot=[:ivory :mintcream],
-            legend=[:topleft :bottomright], grid=true, gridalpha=0.15, margin=5Plots.mm)
+            legend=:best, grid=true, gridalpha=0.15, margin=5Plots.mm)
 
-        leg_size = 9
-        temp_str = @sprintf("y(t) = %.2f °C", y_curr)
-        power_str =  @sprintf("u(t) = %.2f %% (de 2.475 W)", u_curr)
+        leg_size = 10
+        temp_str = latexstring(@sprintf("y(t) = %.2f \\,\\, ^\\circ  C", y_curr))
+        power_str = latexstring(@sprintf("u(t) = %.2f  \\,\\, \\%% ", u_curr))
 
         if np_val <= stab_pts + uee_pts       
        
@@ -401,7 +418,11 @@ end
 #  _step_static  (escalón en lazo cerrado para la curva estática)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-"""Escalón en lazo cerrado hasta `r_ref`. Retorna la potencia y temperatura estacionarias."""
+"""
+Escalón en lazo cerrado con referencia constante `r_ref` durante `t1` segundos,
+graficando junto a los puntos estacionarios ya medidos (`uee`, `yee`). Retorna
+la potencia y la temperatura estacionarias (promedio de las últimas muestras).
+"""
 function _step_static(sys::ThermalSystem, r_ref::Real, uee, yee; t1::Real = 60.0)
     
     h       = SAMPLING_TIME
@@ -431,16 +452,21 @@ function _step_static(sys::ThermalSystem, r_ref::Real, uee, yee; t1::Real = 60.0
         
 
 
-            y_str = @sprintf("y(t) = %.2f °C", y_curr)
-            u_str = @sprintf("u(t) = %.2f °C", u_curr)
+            y_str = latexstring(@sprintf("y(t) = %.2f \\,\\, ^\\circ  C", y_curr))
+            u_str = latexstring(@sprintf("u(t) = %.2f  \\,\\, \\%% ", u_curr))
             
 
             if isempty(yee)
                 ee_str=""
             else
-                ee_str = @sprintf("uee = %.2f %%    yee=%0.2f °C", uee[end], yee[end])
+                ee_str = latexstring(@sprintf("u_{ss} = %.2f \\%% \\,\\,\\, y_{ss}=%0.2f ^\\circ  C", uee[end], yee[end]))
             end
             
+             #legends y plots
+            leg_size = 10
+
+        
+        
             
             p_ee = scatter(uee, yee, color="#d40055", marker=:circle,label = ee_str,
             legendfontsize = leg_size, fg_legend = "#d4aa00", markersize=4, linewidth=1.5)
@@ -451,7 +477,7 @@ function _step_static(sys::ThermalSystem, r_ref::Real, uee, yee; t1::Real = 60.0
 
            
             plot!(p_ins, tv, uv, label=u_str, color="#44aa00", linewidth=1.5)
-            hline!(p_ins, [r_ref], label="Referencia", color=:gray, ls=:dash, linewidth=1)
+            hline!(p_ins, [r_ref], legendfontsize = leg_size, label="Referencia", color=:gray, ls=:dash, linewidth=1)
             
             plt = plot( p_ins, p_ee, layout=(1, 2), size=(900, 500),
             title=["Curva estática – ThermoLab" "Experimento actual"],
@@ -460,7 +486,7 @@ function _step_static(sys::ThermalSystem, r_ref::Real, uee, yee; t1::Real = 60.0
             xlims=[ (0,t1) (0, 60)] ,
             ylims=[(0, 100) (20, 100)],
             background_color_subplot=[ :mintcream :ivory],
-            legend=[:bottomright :bottomright ], 
+            legend=:best, 
             grid=true, gridalpha=0.2,
             xticks=0:10:100, yticks=0:10:100,
             margin=5Plots.mm)
@@ -489,17 +515,17 @@ end
 # ═══════════════════════════════════════════════════════════════════════════════
 
 """
-    get_static_model(sys::ThermalSystem; step=5.0, duration=60.0, usefile=false)
+    get_static_model(sys::ThermalSystem; step=5.0, t1=40.0, usefile=false)
 
 Realiza una secuencia de experimentos de respuesta al escalón en lazo cerrado para
 obtener la curva de ganancia estática (curva potencia vs. temperatura
 estacionaria) de la plataforma ThermoLab.
 
 Esta función fija sucesivamente la referencia de temperatura en los valores
-40, 40 + `step`, 40 + 2·`step`, … hasta 90 °C. Para cada nivel, una vez que la
-temperatura alcanza su valor estacionario, se registran el promedio de las
-últimas 10 muestras de la temperatura y de la potencia aplicada, conforme se
-muestra en la figura siguiente:
+40, 40 + `step`, 40 + 2·`step`, … hasta 90 °C (`MAX_TEMPERATURE`). Para cada
+nivel, una vez que la temperatura alcanza su valor estacionario, se registran
+los promedios de las últimas muestras (≈ 8 s) de la temperatura y de la
+potencia aplicada, conforme se muestra en la figura siguiente:
 
 ![Curva estática potencia-temperatura de ThermoLab](../../assets/get_static_model.png)
 
@@ -510,7 +536,7 @@ A continuación se describen los parámetros de la función:
 
 # Argumentos de palabra clave
 - `step::Real=5.0`: separación, en °C, entre referencias sucesivas.
-- `duration::Real=60.0`: duración, en segundos, de cada escalón de referencia.
+- `t1::Real=40.0`: duración, en segundos, de cada escalón de referencia.
 - `usefile::Bool=false`: si es `true`, no se realiza un experimento nuevo, sino que
   se ajusta el modelo con los datos guardados en
   `datafiles/ThermoLab_static_gain_response.csv`.
@@ -522,18 +548,21 @@ A continuación se describen los parámetros de la función:
 # Notas
 - El controlador que actúa durante los experimentos es el que esté cargado en
   la plataforma (por defecto, el PID que trae el firmware). Debe ser capaz de
-  llevar la temperatura a la referencia en el tiempo `duration`.
-- Al finalizar la secuencia se muestra un modelo lineal que relaciona la
+  llevar la temperatura a la referencia en el tiempo `t1`.
+- Al finalizar la secuencia se ajusta por mínimos cuadrados, se imprime (con
+  su coeficiente ``R^2``) y se grafica un modelo lineal que relaciona la
   temperatura en estado estacionario con la potencia aplicada:
 
-``y_{ee} = K\\,u_{ee} + b``
+  ``y_{ee} = K\\,u_{ee} + b``
 
-  Este modelo se ajusta por mínimos cuadrados; ``b`` corresponde aproximadamente a
-  la temperatura ambiente.
+  donde ``K`` es la ganancia estática (°C/%) y ``b`` corresponde
+  aproximadamente a la temperatura ambiente.
+- Con los valores por defecto se miden 11 niveles, lo que tarda unos 8 minutos.
 
 - Los resultados se guardan en `datafiles/ThermoLab_static_gain_response.csv`
   y `datafiles/ThermoLab_static_pars.csv` (usados luego por
-  [`temp_from_power`](@ref) y [`power_from_temp`](@ref)).
+  [`temp_from_power`](@ref), [`power_from_temp`](@ref), [`step_open`](@ref) y
+  [`prbs_open`](@ref)). Al terminar, la referencia se fija en 40 °C.
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab y de haber
@@ -554,18 +583,18 @@ function get_static_model(sys::ThermalSystem;
                           step::Real    = 5.0, t1::Real = 40.0,
                           usefile::Bool = false)
     if usefile
-        uss, yss = read_csv_file(PATH_DATA * "Thermal_static_gain_response.csv")
+        uss, yss = read_csv_file(_datafile("ThermoLab_static_gain_response.csv"))
     else
 
 
         plt = plot(layout=(1, 2), size=(900, 500),
-            title=["Curva estática – ThermoLab" "Experimento actual"],
+            title=[ "Experimento actual" "Curva estática – ThermoLab"],
             xlabel=[ "Tiempo (s)" "Potencia (%)"],
-            ylabel=["Temp. (°C) y potencia (%) actual" "Temperatura estacionaria (°C)" ], 
+            ylabel=["Temp. [°C] y potencia [%] actual" "Temperatura estacionaria [°C]" ], 
             xlims=[ (0,t1) (0, 60)] ,
             ylims=[(0, 100) (20, 100)],
             background_color_subplot=[ :mintcream :ivory],
-            legend=[:bottomright :bottomright ], 
+            legend= :best, 
             grid=true, gridalpha=0.2,
             xticks=0:10:100, yticks=0:10:100,
             margin=5Plots.mm)
@@ -608,9 +637,9 @@ function get_static_model(sys::ThermalSystem;
         color="#d40055", marker=:circle, markersize=4, linewidth=1.5)
 
     # Modelo lineal
-    mod_str = @sprintf("%.2f uee + %0.2f  (R² = %0.2f)", K, b, R²)
+    mod_str = latexstring(@sprintf("T_{ss}=%.2f\\, u_{ss} + %0.2f", K, b))
     plot!(datos, collect(u_fit), y_fit,
-        label = mod_str,
+        label = mod_str, legendfontsize = 12,
         color="#0055d4", linewidth=2, linestyle=:dash)
 
     plt = plot(datos,  size=(600,600), 
@@ -619,7 +648,7 @@ function get_static_model(sys::ThermalSystem;
         ylabel="Temperatura estacionaria (°C)",
         xlims=(0, 60), ylims=(30, 100),
         background_color_subplot=:ivory,
-        legend=:topleft, grid=true, gridalpha=0.2,
+        legend=:best, grid=true, gridalpha=0.2,
         xticks=0:10:100, yticks=20:10:100,
         margin=3Plots.mm)
     redraw!(plt)
@@ -666,7 +695,9 @@ Los parámetros de esta función son los siguientes:
   se obtiene el modelo FOTD.
 - `amplitude::Real=10`: amplitud del escalón de potencia, en %.
 - `t1::Real=600`: duración en segundos del escalón. Debe ser suficiente para que la
-  temperatura llegue al estado estacionario (varias constantes de tiempo).
+  temperatura llegue al estado estacionario (varias constantes de tiempo). La
+  fase de estabilización y la de retención usan los valores por defecto de
+  [`step_open`](@ref).
 - `usefile::Bool=false`: si es `true`, se usan los datos del último experimento,
   guardados en `datafiles/ThermoLab_step_open_exp.csv` en lugar de ejecutar uno
   nuevo.
@@ -685,7 +716,9 @@ Los parámetros de esta función son los siguientes:
   `α = Δy/Δu` se calcula directamente de los valores estacionarios antes y
   después del escalón.
 - Se muestra una gráfica comparando la salida experimental con el modelo
-  simulado, y se guardan los parámetros en `datafiles/ThermoLab_fo_model_2p.csv`.
+  simulado, y se guardan los parámetros ``b``, ``a`` y ``L`` en
+  `datafiles/ThermoLab_fo_model_2p.csv`. Luego se pueden recuperar con
+  [`tf`](@ref), [`ss`](@ref) o [`get_last_model`](@ref) (con `numpar=2`).
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab y de haber
@@ -787,7 +820,7 @@ end
 # ═══════════════════════════════════════════════════════════════════════════════
 
 """
-    get_model_prbs(sys::ThermalSystem; yop=50, amplitude=4, divider=25, numpar=2, usefile=false)
+    get_model_prbs(sys::ThermalSystem; yop=50, amplitude=5, divider=25, numpar=2, usefile=false)
 
 Estima un modelo dinámico lineal que relaciona la temperatura de la plataforma ThermoLab con
 la potencia aplicada. Según el valor de `numpar`, el modelo puede ser:
@@ -815,9 +848,10 @@ Los parámetros de esta función son los siguientes:
 # Argumentos de palabra clave
 - `yop::Real=50`: temperatura del punto de operación (en °C) alrededor del cual
   se obtiene el modelo lineal.
-- `amplitude::Real=4`: amplitud pico de la señal PRBS, en % de potencia.
+- `amplitude::Real=5`: amplitud pico de la señal PRBS, en % de potencia.
 - `divider::Int=25`: número de periodos de muestreo que dura cada bit de la PRBS
-  (ver [`prbs_open`](@ref)).
+  (ver [`prbs_open`](@ref)). El experimento usa una fase de estabilización de
+  150 s y una de retención de 10 s.
 - `numpar::Int=2`: número de parámetros del modelo a estimar: `2` para el modelo de
   primer orden ``b/(s+a)`` o `3` para el modelo de dos polos ``b/((s+a_1)(s+a_2))``.
 - `usefile::Bool=false`: si es `true`, no se realiza un experimento nuevo, sino que se
@@ -829,7 +863,12 @@ Los parámetros de esta función son los siguientes:
   identificado a partir de los datos PRBS (de uno o dos polos, según `numpar`).
 - `L::Float64`: retardo, fijado en un periodo de muestreo (0.8 s).
 
+# Lanza
+- `ErrorException` si `numpar` no es `2` ni `3`.
+
 # Notas
+- La identificación se hace sobre las desviaciones de `u` y `y` respecto a sus
+  valores medios durante la PRBS.
 - Con `numpar=2` se ajusta un modelo ARX discreto de orden (1,1) con retardo de una
   muestra, usando el estimador de
   [ControlSystemIdentification.jl](https://github.com/baggepinnen/ControlSystemIdentification.jl),
@@ -839,8 +878,10 @@ Los parámetros de esta función son los siguientes:
   directamente ``a_1``, ``a_2`` y ``b`` del modelo continuo.
 - Al finalizar, se muestra una gráfica que compara la salida experimental con la
   simulada por el modelo (indicando el porcentaje de ajuste, o *FIT*), y se guardan los
-  parámetros estimados. Luego se pueden recuperar con [`tf`](@ref), [`ss`](@ref) o
-  [`get_last_model`](@ref) usando el mismo valor de `numpar`.
+  parámetros estimados en `datafiles/ThermoLab_fo_model_2p.csv` (`numpar=2`) o
+  `datafiles/ThermoLab_fo_model_3p.csv` (`numpar=3`). Luego se pueden
+  recuperar con [`tf`](@ref), [`ss`](@ref) o [`get_last_model`](@ref) usando el
+  mismo valor de `numpar`.
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab y de haber
@@ -879,7 +920,7 @@ function get_model_prbs(sys::ThermalSystem;
 
     if !usefile
         t, u, y = prbs_open(sys; yop=yop, amplitude=amplitude, divider=divider,
-                            stab_time=240, uee_time=10)
+                            stab_time=150, uee_time=10)
     else
         t, u, y = read_csv_file3(_datafile("ThermoLab_prbs_open_exp.csv"))
     end
@@ -940,11 +981,11 @@ function get_model_prbs(sys::ThermalSystem;
         xlabel=["" "Tiempo (s)"],
         xlims=[xlims_v xlims_v],
         background_color_subplot=[:ivory :mintcream],
-        legend=:bottomleft, grid=true, gridalpha=0.15, margin=5Plots.mm)
+        legend=:best, grid=true, gridalpha=0.15, margin=5Plots.mm)
     plot!(plt, subplot=1, t, ym .+ ymean_val,
           label="Datos", color=:teal, linewidth=1.5, linestyle=:dot)
     plot!(plt, subplot=1, t, ysim .+ ymean_val,
-          label=modelstr1, color=:deeppink, linewidth=1.5)
+          label=modelstr1, legendfontsize = 9, color=:deeppink, linewidth=1.5)
     plot!(plt, subplot=2, t, u,
           label="PRBS", color=:green, seriestype=:steppre)
     redraw!(plt)

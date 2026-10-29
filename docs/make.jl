@@ -54,6 +54,7 @@ makedocs(;
                 "`cont1dof`" => "funciones/diseno/cont1dof.md",
                 "`cont2dof`" => "funciones/diseno/cont2dof.md",
                 "`lqmodel`" => "funciones/diseno/lqmodel.md",
+                "`itaemodel`" => "funciones/diseno/itaemodel.md",
             ],
         ],
     ],

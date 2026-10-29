@@ -7,9 +7,8 @@
 """
     setup_fig(nrows; figsize=(900,500))
 
-Crea una figura con `nrows` subplots verticales usando Plots.jl.
-Retorna el objeto plot y un vector de índices de subplot.
-En Plots.jl, actualizamos los datos directamente y usamos `display()`.
+Crea y muestra una figura de Plots.jl con `nrows` subplots verticales.
+Retorna el objeto plot.
 """
 function setup_fig(nrows::Int; figsize=(900, 500))
     # Se usan layouts de Plots.jl
@@ -23,23 +22,10 @@ end
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  pantalla.jl – Visualización en tiempo real unificada: REPL, Jupyter y Pluto.
+#  Visualización en tiempo real unificada: REPL, Jupyter y Pluto.
 #
-#  Requiere que ThermoLab declare dos dependencias livianas (una sola vez):
-#
-#      pkg> activate <ruta de ThermoLab>
-#      pkg> add HypertextLiteral AbstractPlutoDingetjes
-#
-#  y en ThermoLab.jl:
-#
-#      include("thermalsys.jl")    # (borrar allí redraw! y _ijulia)
-#      include("pantalla.jl")
-#      export redraw!, pantalla, entorno
-#
-#  Con eso, el notebook de Pluto solo necesita `using ThermoLab`.
-#
-#  Los experimentos NO cambian: `on_frame` sigue armando la figura y llamando
-#  `redraw!(plt)`; lo único que varía es a dónde va a parar la figura:
+#  Los experimentos arman la figura en su `on_sample` y llaman `redraw!(plt)`;
+#  lo único que varía según el entorno es a dónde va a parar la figura:
 #
 #      REPL     -> display(plt)                    (ventana GR, se redibuja sola)
 #      Jupyter  -> clear_output(true) + display    (misma salida de la celda)
@@ -66,9 +52,11 @@ import AbstractPlutoDingetjes
 _ijulia() = isdefined(Main, :IJulia) ? getfield(Main, :IJulia) : nothing
 
 """
-    entorno() -> :pluto | :jupyter | :script
+    entorno() -> Symbol
 
-Identifica dónde se está ejecutando para decidir cómo mostrar cada figura.
+Identifica dónde se está ejecutando el código, para decidir cómo mostrar cada
+figura: retorna `:pluto` en un notebook de Pluto, `:jupyter` si IJulia está
+cargado, y `:script` en cualquier otro caso (REPL, VS Code o script).
 """
 entorno() = isdefined(Main, :PlutoRunner) ? :pluto :
             (_ijulia() !== nothing       ? :jupyter : :script)
@@ -111,8 +99,11 @@ end
 """
     redraw!(plt)
 
-Muestra la figura en el destino que corresponda al entorno. Es la misma llamada
-que ya usan todos los `on_frame`; los experimentos no necesitan cambios.
+Muestra la figura `plt` en el destino que corresponda al entorno (ver
+[`entorno`](@ref)): con `display` en el REPL o en un script; reemplazando la
+salida de la celda en Jupyter; y publicándola para [`screen_pluto`](@ref) en
+Pluto. Todos los experimentos la usan para actualizar sus gráficas en tiempo
+real. Retorna `nothing`.
 """
 function redraw!(plt)
     ent = entorno()
@@ -143,15 +134,37 @@ _hay_enlace_js() = isdefined(AbstractPlutoDingetjes, :Display) &&
                    isdefined(AbstractPlutoDingetjes.Display, :with_js_link)
 
 """
-    screen_pluto(; alto = nothing)
+    screen_pluto(; alto=nothing)
 
 Widget de monitoreo para Pluto: una celda que muestra cada figura que los
-experimentos publican con `redraw!`. Créela UNA vez, en su propia celda (de
-preferencia antes de las celdas de experimentos), y corra los experimentos en
-las celdas que quiera; la pantalla se actualiza sola.
+experimentos publican con [`redraw!`](@ref). Créela UNA vez, en su propia celda
+(de preferencia antes de las celdas de experimentos), y corra los experimentos
+en las celdas que quiera; la pantalla se actualiza sola.
 
-Fuera de Pluto no hace falta: `redraw!` muestra directo en la ventana GR o en
-la celda de Jupyter.
+# Argumentos de palabra clave
+- `alto=nothing`: altura de la imagen, en píxeles. Con `nothing` la imagen
+  conserva su proporción y ocupa el ancho disponible.
+
+# Retorna
+- En Pluto, el widget HTML; fuera de Pluto, `nothing` (no hace falta:
+  `redraw!` muestra directo en la ventana de gráficos o en la celda de Jupyter).
+
+# Lanza
+- `ErrorException` si la versión instalada de AbstractPlutoDingetjes no
+  expone `Display.with_js_link`.
+
+# Ejemplo
+```julia
+# celda 1
+using ThermoLab
+sys = ThermalSystem()
+
+# celda 2
+screen_pluto()
+
+# celda 3
+t, r, y, u = step_closed(sys; r0=40, r1=50, t0=60, t1=120)
+```
 """
 function screen_pluto(; alto = nothing)
     entorno() === :pluto || return nothing   # fuera de Pluto la pantalla es implícita

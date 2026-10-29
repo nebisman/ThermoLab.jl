@@ -6,4 +6,5 @@ CurrentModule = ThermoLab
 
 ```@docs
 stepinfo(res, T)
+StepInfoSR
 ```
