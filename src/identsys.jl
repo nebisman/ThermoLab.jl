@@ -48,9 +48,9 @@ El experimento tiene tres fases, como se muestra en la figura siguiente:
 ![Respuesta al escalón en lazo abierto de la plataforma ThermoLab](../../assets/step_open.png)
 
 1. **Estabilización** (duración `stab_time`): un controlador PI interno del
-   firmware lleva la temperatura al punto de operación `yop`.
+   firmware lleva la temperatura al punto de operación `yop` deseado para identificar el sistema.
 2. **Retención** (duración `uee_time`): se abre el lazo y se mantiene
-   constante la potencia ``u_{ee}`` que sostiene la temperatura en `yop`.
+   constante la potencia `uee` que sostiene la temperatura en `yop`.
 3. **Escalón** (duración `t1`): la potencia pasa a ``u_{ee}`` + `amplitude`.
 
 Los parámetros mostrados en la figura se describen a continuación.
@@ -73,20 +73,11 @@ Los parámetros mostrados en la figura se describen a continuación.
 
 # Notas
 - Se usa típicamente para identificar el modelo dinámico de la plataforma
-  **ThermoLab** (ver [`get_model_step`](@ref)). La respuesta se grafica en tiempo real.
-- La potencia de operación se estima con el modelo estático (ver
-  [`get_static_model`](@ref) y [`power_from_temp`](@ref)) solo para verificar que el
-  escalón no exceda el intervalo [0, 100] % y para escalar la gráfica.
-- Los datos del experimento se guardan en un archivo CSV en
-  `datafiles/ThermoLab_step_open_exp.csv`. En ese archivo el tiempo está
-  desplazado para que `t = 0` corresponda al instante del escalón.
-- Al terminar, la referencia se fija en 40 °C y se reactiva el controlador
-  cargado en la plataforma.
+  **ThermoLab** (ver [`get_model_step`](@ref)).
+
 
 # Lanza
-- `ErrorException` si `yop` está fuera del intervalo admitido por
-  [`power_from_temp`](@ref), o si la potencia de operación estimada más
-  `amplitude` supera el 100 %.
+- `ErrorException` si `yop` es mayor a 95°C.
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab y de haber
@@ -234,19 +225,20 @@ end
 """
     prbs_open(sys::ThermalSystem; yop=50, amplitude=5, stab_time=90, uee_time=10, divider=25)
 
-Configura y ejecuta un experimento de identificación en lazo abierto,
+Configura y ejecuta un experimento de identificación en lazo abierto (esto es, sin ningún controlador activo),
 excitando la plataforma **ThermoLab** con una señal binaria pseudoaleatoria (PRBS)
-de potencia alrededor de un punto de operación, como se ilustra en la figura:
+de potencia alrededor de un punto de operación, denotado `yop`.
+
+El experimento tiene tres fases, como se muestra en la figura siguiente:
 
 ![Señal PRBS aplicada en lazo abierto a la plataforma ThermoLab](../../assets/prbs_open.png)
 
-Igual que en [`step_open`](@ref), el experimento tiene tres fases:
-**estabilización** en la temperatura `yop` (durante `stab_time`) con un PI interno
-del firmware, **retención** de la potencia de operación ``u_{ee}`` (durante `uee_time`),
-y finalmente la **señal PRBS**, que alterna entre ``u_{ee}`` - `amplitude` y
-``u_{ee}`` + `amplitude`.
-
-Los parámetros de esta función son:
+1. **Estabilización** (duración `stab_time`): un controlador PI interno del
+   firmware lleva la temperatura al punto de operación `yop` deseado para identificar el sistema.
+2. **Retención** (duración `uee_time`): se abre el lazo y se mantiene
+   constante la potencia ``u_{ee}`` que sostiene la temperatura en `yop`.
+3. **Señal PRBS**: la potencia alterna entre ``u_{ee} - A`` y ``u_{ee} + A``,
+   con ``A`` = `amplitude`, siguiendo una secuencia binaria pseudoaleatoria.
 
 # Argumentos
 - `sys::ThermalSystem`: objeto que representa la plataforma.
@@ -260,11 +252,6 @@ Los parámetros de esta función son:
   mantiene cada bit de la secuencia PRBS (a mayor valor en `divider`, se aplica una señal más
   "lenta" y de mayor duración total).
 
-  Note que el tamaño de la secuencia PRBS es fijo
-   (tiene 63 valores ya grabados en el firmware de la plataforma) y cada uno de esos
-   valores se repite un número `divider` de veces. Con `divider=25` la señal PRBS
-   dura ``63 \\times 25 \\times 0.8 = 1260`` s.
-
 # Retorna
 - `(t, u, y)`: tupla de vectores `Vector{Float64}` con el tiempo (s), la
   potencia aplicada (%) y la temperatura medida (°C) durante la señal PRBS. El
@@ -272,20 +259,18 @@ Los parámetros de esta función son:
   estabilización y retención), igual que en el archivo CSV guardado.
 
 # Notas
-
+- El tamaño de la secuencia PRBS es fijo (63 valores grabados en el firmware de la plataforma) y cada
+  valor se repite `divider` veces. Con `divider=25` la señal PRBS
+  dura ``63 \\times 25 \\times 0.8 = 1260`` s.
 - Esta función se usa para identificar el modelo dinámico de la plataforma
-  por medio de  [`get_model_prbs`](@ref). El usuario también puede
-  disponer de los datos para usar otros algoritmos de identificación de sistemas como los
+  por medio de [`get_model_prbs`](@ref). El usuario también puede
+  disponer de los datos para usar otros algoritmos de identificación de sistemas, como los
   del paquete [ControlSystemIdentification.jl](https://github.com/baggepinnen/ControlSystemIdentification.jl).
-- Los datos del experimento se guardan en un archivo CSV en
-  `datafiles/ThermoLab_prbs_open_exp.csv`.
-- Al terminar, la referencia se fija en 40 °C y se reactiva el controlador
-  cargado en la plataforma.
+
+
 
 # Lanza
-- `ErrorException` si `yop` está fuera del intervalo admitido por
-  [`power_from_temp`](@ref), o si la potencia de operación estimada más
-  `amplitude` supera el 100 %.
+- `ErrorException` si `yop` es mayor a 95°C.
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab y de haber
@@ -299,7 +284,7 @@ sys = ThermalSystem();
 Luego, obtenga la respuesta a la señal PRBS en lazo abierto así:
 
 ```julia
-t, u, y = prbs_open(sys; yop=50, amplitude=4, divider=25);
+t, u, y = prbs_open(sys; yop=55, amplitude=5, divider=25);
 ```
 """
 function prbs_open(sys::ThermalSystem;
@@ -637,7 +622,7 @@ function get_static_model(sys::ThermalSystem;
         color="#d40055", marker=:circle, markersize=4, linewidth=1.5)
 
     # Modelo lineal
-    mod_str = latexstring(@sprintf("T_{ss}=%.2f\\, u_{ss} + %0.2f", K, b))
+    mod_str = latexstring(@sprintf("T_{ee}=%.2f\\, u_{ee} + %0.2f", K, b))
     plot!(datos, collect(u_fit), y_fit,
         label = mod_str, legendfontsize = 12,
         color="#0055d4", linewidth=2, linestyle=:dash)
@@ -695,9 +680,7 @@ Los parámetros de esta función son los siguientes:
   se obtiene el modelo FOTD.
 - `amplitude::Real=10`: amplitud del escalón de potencia, en %.
 - `t1::Real=600`: duración en segundos del escalón. Debe ser suficiente para que la
-  temperatura llegue al estado estacionario (varias constantes de tiempo). La
-  fase de estabilización y la de retención usan los valores por defecto de
-  [`step_open`](@ref).
+  temperatura llegue al estado estacionario.
 - `usefile::Bool=false`: si es `true`, se usan los datos del último experimento,
   guardados en `datafiles/ThermoLab_step_open_exp.csv` en lugar de ejecutar uno
   nuevo.
@@ -716,8 +699,7 @@ Los parámetros de esta función son los siguientes:
   `α = Δy/Δu` se calcula directamente de los valores estacionarios antes y
   después del escalón.
 - Se muestra una gráfica comparando la salida experimental con el modelo
-  simulado, y se guardan los parámetros ``b``, ``a`` y ``L`` en
-  `datafiles/ThermoLab_fo_model_2p.csv`. Luego se pueden recuperar con
+  simulado. Los  parámetros ``b``, ``a`` y ``L``   se pueden luego recuperar con
   [`tf`](@ref), [`ss`](@ref) o [`get_last_model`](@ref) (con `numpar=2`).
 
 # Ejemplo
@@ -822,7 +804,7 @@ end
 """
     get_model_prbs(sys::ThermalSystem; yop=50, amplitude=5, divider=25, numpar=2, usefile=false)
 
-Estima un modelo dinámico lineal que relaciona la temperatura de la plataforma ThermoLab con
+Estima los parámetros de un modelo dinámico lineal que relaciona la temperatura de la plataforma ThermoLab con
 la potencia aplicada. Según el valor de `numpar`, el modelo puede ser:
 
 - `numpar=2` (por defecto): modelo de primer orden, con dos parámetros (``a`` y ``b``):
@@ -851,7 +833,7 @@ Los parámetros de esta función son los siguientes:
 - `amplitude::Real=5`: amplitud pico de la señal PRBS, en % de potencia.
 - `divider::Int=25`: número de periodos de muestreo que dura cada bit de la PRBS
   (ver [`prbs_open`](@ref)). El experimento usa una fase de estabilización de
-  150 s y una de retención de 10 s.
+  240 s y una de retención de 10 s.
 - `numpar::Int=2`: número de parámetros del modelo a estimar: `2` para el modelo de
   primer orden ``b/(s+a)`` o `3` para el modelo de dos polos ``b/((s+a_1)(s+a_2))``.
 - `usefile::Bool=false`: si es `true`, no se realiza un experimento nuevo, sino que se
@@ -877,11 +859,9 @@ Los parámetros de esta función son los siguientes:
   predicción (`structured_pem` de ControlSystemIdentification.jl), estimando
   directamente ``a_1``, ``a_2`` y ``b`` del modelo continuo.
 - Al finalizar, se muestra una gráfica que compara la salida experimental con la
-  simulada por el modelo (indicando el porcentaje de ajuste, o *FIT*), y se guardan los
-  parámetros estimados en `datafiles/ThermoLab_fo_model_2p.csv` (`numpar=2`) o
-  `datafiles/ThermoLab_fo_model_3p.csv` (`numpar=3`). Luego se pueden
-  recuperar con [`tf`](@ref), [`ss`](@ref) o [`get_last_model`](@ref) usando el
-  mismo valor de `numpar`.
+  simulada por el modelo (indicando el porcentaje de ajuste, o *FIT*).  Los parámetros estimados
+  se pueden pueden recuperar luego con [`tf`](@ref), [`ss`](@ref) o [`get_last_model`](@ref) usando el
+  el valor de `numpar` requerido.
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab y de haber
@@ -920,7 +900,7 @@ function get_model_prbs(sys::ThermalSystem;
 
     if !usefile
         t, u, y = prbs_open(sys; yop=yop, amplitude=amplitude, divider=divider,
-                            stab_time=150, uee_time=10)
+                            stab_time=240, uee_time=10)
     else
         t, u, y = read_csv_file3(_datafile("ThermoLab_prbs_open_exp.csv"))
     end

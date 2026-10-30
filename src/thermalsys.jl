@@ -22,7 +22,7 @@ const PRBS_LENGTH   = 63
 const DEFAULT_REFERENCE = 40.0
 
 """Temperatura máxima de referencia (°C) admitida por el paquete."""
-const MAX_TEMPERATURE   = 90.0
+const MAX_TEMPERATURE   = 95.0
 
 """Tamaño de fuente por defecto usado en las gráficas."""
 const FONT_SIZE     = 12
@@ -732,13 +732,13 @@ end
     temp_from_power(sys::ThermalSystem, power::Real)
 
 Estima la temperatura de estado estacionario (en °C) que alcanza la plataforma ThermoLab
-al aplicarle una potencia constante `power`, expresada en porcentaje de la potencia máxima.
+al aplicarle una potencia constante `power`, expresada en porcentaje.
 
 Para ello usa el modelo estático lineal (obtenido con [`get_static_model`](@ref)):
 
 ``\\qquad \\text{\\texttt{temp}} = K\\cdot \\text{\\texttt{power}} + b``,
 
-el cual debe haber sido previamente ajustado al correr [`get_static_model`](@ref).
+
 
 # Argumentos
 - `sys::ThermalSystem`: objeto que representa la plataforma
@@ -759,11 +759,9 @@ el cual debe haber sido previamente ajustado al correr [`get_static_model`](@ref
 using ThermoLab
 sys = ThermalSystem();
 temp_from_power(sys, 20.0)
-
-    49.89
 ```
 
-El valor depende del modelo estático guardado en la carpeta `datafiles`.
+El valor depende del modelo estático previamente obtenido.
 """
 function temp_from_power(sys::ThermalSystem, power::Real)
     0 <= power <= 100 || error("power debe estar en [0, 100] %")
@@ -774,7 +772,7 @@ end
 """
     power_from_temp(sys::ThermalSystem, temp::Real)
 
-Estima la potencia constante (en % de la potencia máxima) necesaria para que la plataforma
+Estima la potencia  (en % de la potencia máxima) necesaria para que la plataforma
 ThermoLab alcance, en estado estacionario, la temperatura `temp` (en °C). Es la función
 inversa de [`temp_from_power`](@ref) y usa el mismo modelo estático lineal obtenido con
 [`get_static_model`](@ref):
@@ -785,7 +783,7 @@ inversa de [`temp_from_power`](@ref) y usa el mismo modelo estático lineal obte
 - `sys::ThermalSystem`: objeto que representa la plataforma
 - `temp::Real`: temperatura de estado estacionario especificada (en °C). Debe cumplir que
 
-   ``b \\leq`` `temp` ``\\leq 90\\,°C`` (`MAX_TEMPERATURE`)
+   ``b \\leq`` `temp` ``\\leq 95\\,°C`` (`MAX_TEMPERATURE`)
 
    donde ``b`` es la temperatura estimada sin potencia aplicada (temperatura ambiente).
 
@@ -802,8 +800,6 @@ inversa de [`temp_from_power`](@ref) y usa el mismo modelo estático lineal obte
 using ThermoLab
 sys = ThermalSystem();
 power_from_temp(sys, 50.0)
-
-    20.09
 ```
 
 El valor depende del modelo estático guardado en la carpeta `datafiles`.

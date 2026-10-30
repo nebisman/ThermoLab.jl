@@ -11,18 +11,17 @@ using Polynomials
     cont2dof(G, T, m, polesobs=[])
 
 Calcula, mediante un método lineal algebraico, un controlador de dos grados de libertad (2-GDL)
-que hace que la respuesta de lazo cerrado de la planta `G` coincida con la
-función de transferencia deseada `T`.
+que hace que la respuesta de lazo cerrado para la planta `G` se ajuste con una
+función de transferencia deseada `T` elegida por el diseñador.
 
 # Argumentos
 - `G`: Función de transferencia de la planta, de orden `n`.
-- `T`: Función de transferencia de lazo cerrado deseada. El algoritmo trabaja
-  con ``T(s)/N(s)``, donde ``N(s)`` es el numerador de `G`; si `T` no contiene
-  los ceros de `G`, el controlador los cancela (solo es válido si son estables).
+- `T`: Función de transferencia de lazo cerrado deseada. 
 - `m::Int`: Orden del controlador. Debe ser al menos `n-1`.
-- `polesobs::Vector=[]`: polos del observador implícito, que se cancelan en la
+- `polesobs::Vector=[]`: polos del observador, que se cancelan en la
   respuesta de la referencia a la salida. Su número debe ser
-  `n + m - gr(T/N)`, con `gr(T/N)` el grado del denominador de ``T(s)/N(s)``.
+  `n + m - gr(T/N)`, con `gr(T/N)` el grado del denominador de ``T(s)/N(s)`` una vez cancelados
+   los términos comunes.
 
 # Retorna
 - `C`: matriz de transferencia 1×2 del controlador, definida como:
@@ -41,9 +40,9 @@ función de transferencia deseada `T`.
 
 # Notas
 - Si selecciona un orden del controlador tal que `m > n-1`, el algoritmo
-  intenta colocar automáticamente acción integral (``A(0) = 0``) en el
+  coloca automáticamente acción integral (``A(0) = 0``) en el
   controlador diseñado.
-- Las funciones [`lqmodel`](@ref) e [`itaemodel`](@ref) ayudan a escoger `T`.
+- Las funciones [`lqmodel`](@ref) e [`itaemodel`](@ref)  pueden ayudar a escoger un modelo `T`.
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab, de haber
@@ -186,7 +185,7 @@ end
 """
     cont1dof(G, poles)
 
-Calcula, mediante el método lineal algebraico, un controlador 1-GDL de realimentación
+Calcula, mediante un método lineal algebraico, un controlador 1-GDL de realimentación
 unitaria que ubica los polos de lazo cerrado, según los polos indicados por el vector `poles`.
 
 # Argumentos
@@ -195,7 +194,7 @@ unitaria que ubica los polos de lazo cerrado, según los polos indicados por el 
   determina el orden del controlador: `m = length(poles) - n`.
 
 # Retorna
-- `C`: función de transferencia del controlador, con ``u = C\\,(r - y)``. Se
+- `C`: función de transferencia del controlador. Se
   carga en la plataforma con [`set_controller`](@ref).
 
 # Lanza
@@ -203,7 +202,7 @@ unitaria que ubica los polos de lazo cerrado, según los polos indicados por el 
   orden de `G`), es decir, si el orden  del controlador resulta menor que `n - 1`.
 
 # Notas
-- Si `length(poles) ≥ 2n` (es decir, `m > n-1`), el algoritmo intenta colocar
+- Si `length(poles) ≥ 2n` (es decir, `m > n-1`), el algoritmo ajusta
   automáticamente acción integral en el controlador diseñado.
 
 # Ejemplo
@@ -220,7 +219,6 @@ G = tf(sys)
 ```
 
 Luego, defina los polos deseados de lazo cerrado y diseñe el controlador
-(con dos polos para la planta de primer orden se obtiene un PI):
 
 ```julia
 polos_lc = [-0.08+0.06im, -0.08-0.06im]
@@ -316,10 +314,10 @@ end
 Calcula, por factorización espectral, la respuesta de lazo cerrado óptima
 LQ para la planta `G`, que minimiza el índice cuadrático
 
-``J = \\int_0^\\infty \\left( q\\,e^2(t) + \\tilde u^2(t) \\right) dt``
+``J = \\int_0^\\infty \\left( q\\,e^2(t) +  u^2(t) \\right) dt``
 
-donde ``e = r - y`` es el error de seguimiento y ``\\tilde u`` la desviación de
-la señal de control respecto a su valor final. Los polos de `T` son las raíces
+donde ``e = r - y`` es el error de seguimiento y ``u`` es la
+la señal de control. Los polos de `T` son las raíces
 estables de ``D(s)D(-s) + q\\,N(s)N(-s)``, con ``G = N/D``.
 
 # Argumentos
@@ -442,14 +440,14 @@ const ITAE_VELOCIDAD = Dict(
 """
     itaemodel(order=3, omega=1.0; type=:pos)
 
-Calcula la función de transferencia de lazo cerrado de orden `order` que
-minimiza el índice ``ITAE = \\int_0^\\infty t\\,|e(t)|\\,dt``, con frecuencia
-``\\omega_0`` = `omega`, a partir de los coeficientes normalizados de tabla.
+Retorna la función de transferencia de lazo cerrado de orden `order` que
+minimiza el índice **ITAE** definido como``ITAE = \\int_0^\\infty t\\,|e(t)|\\,dt``, con frecuencia
+``\\omega_0`` = `omega`, a partir de los coeficientes normalizados tabulados en la literatura.
 
 # Argumentos
 - `order::Int=3`: Orden ``n`` de la función de transferencia. Con `type=:pos`
-  admite de 1 a 6; con `type=:speed`, de 2 a 6.
-- `omega::Real=1.0`: Frecuencia ``\\omega_0`` (rad/s) de la respuesta.
+  admite un orden entre 1 y 6; con `type=:speed`, un orden de 2 a 6.
+- `omega::Real=1.0`: Frecuencia seleccionada ``\\omega_0`` (rad/s) de la respuesta.
 
 # Argumentos de palabra clave
 - `type::Symbol=:pos`: Tipo de respuesta ITAE.
@@ -465,7 +463,7 @@ minimiza el índice ``ITAE = \\int_0^\\infty t\\,|e(t)|\\,dt``, con frecuencia
 
 # Lanza
 - `ErrorException` si `type` no es `:pos` ni `:speed`, si `order` está fuera
-  del intervalo admitido para ese `type`, o si `omega` no es positiva.
+  del intervalo admitido , o si `omega` no es positiva.
 
 # Notas
 - El parámetro `omega` cambia la velocidad de la respuesta pero no su forma: un
