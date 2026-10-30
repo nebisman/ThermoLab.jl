@@ -23,10 +23,10 @@ la plataforma muestran con un mapa de color la temperatura, la referencia y la p
 ## Notas
 Cuando el usuario carga el paquete por primera vez en un directorio de trabajo, se crean automáticamente allí las dos siguientes carpetas:
 
-- `ejemplos/`: scripts, notebooks Pluto y notebooks Jupyter con ejemplos de
+- `ejemplos_tmlab/`: scripts, notebooks Pluto y notebooks Jupyter con ejemplos de
   identificación y control (PI, PID, diseño de uno y dos grados de libertad, entre otros).
   Se recomienda iniciar revisando los ejemplos en el directorio `scripts/`.
-- `datafiles/`: archivos CSV con los datos generados por los experimentos
+- `datafiles_tmlab/`: archivos CSV con los datos generados por los experimentos
   (identificación, respuesta al escalón, PRBS, etc.), usados como entrada y salida  por las funciones del paquete.
 
 Tenga en cuenta que el sistema térmico es lento (su constante de tiempo es de decenas de

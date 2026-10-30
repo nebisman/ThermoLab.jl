@@ -524,7 +524,7 @@ A continuación se describen los parámetros de la función:
 - `t1::Real=40.0`: duración, en segundos, de cada escalón de referencia.
 - `usefile::Bool=false`: si es `true`, no se realiza un experimento nuevo, sino que
   se ajusta el modelo con los datos guardados en
-  `datafiles/ThermoLab_static_gain_response.csv`.
+  `datafiles_tmlab/ThermoLab_static_gain_response.csv`.
 
 # Retorna
 - `(uee, yee)`: tupla de vectores `Vector{Float64}` con las potencias
@@ -544,8 +544,8 @@ A continuación se describen los parámetros de la función:
   aproximadamente a la temperatura ambiente.
 - Con los valores por defecto se miden 11 niveles, lo que tarda unos 8 minutos.
 
-- Los resultados se guardan en `datafiles/ThermoLab_static_gain_response.csv`
-  y `datafiles/ThermoLab_static_pars.csv` (usados luego por
+- Los resultados se guardan en `datafiles_tmlab/ThermoLab_static_gain_response.csv`
+  y `datafiles_tmlab/ThermoLab_static_pars.csv` (usados luego por
   [`temp_from_power`](@ref), [`power_from_temp`](@ref), [`step_open`](@ref) y
   [`prbs_open`](@ref)). Al terminar, la referencia se fija en 40 °C.
 
@@ -682,7 +682,7 @@ Los parámetros de esta función son los siguientes:
 - `t1::Real=600`: duración en segundos del escalón. Debe ser suficiente para que la
   temperatura llegue al estado estacionario.
 - `usefile::Bool=false`: si es `true`, se usan los datos del último experimento,
-  guardados en `datafiles/ThermoLab_step_open_exp.csv` en lugar de ejecutar uno
+  guardados en `datafiles_tmlab/ThermoLab_step_open_exp.csv` en lugar de ejecutar uno
   nuevo.
 
 # Retorna
@@ -838,7 +838,7 @@ Los parámetros de esta función son los siguientes:
   primer orden ``b/(s+a)`` o `3` para el modelo de dos polos ``b/((s+a_1)(s+a_2))``.
 - `usefile::Bool=false`: si es `true`, no se realiza un experimento nuevo, sino que se
   usan los datos del último experimento PRBS guardado en
-  `datafiles/ThermoLab_prbs_open_exp.csv` para estimar los parámetros del modelo.
+  `datafiles_tmlab/ThermoLab_prbs_open_exp.csv` para estimar los parámetros del modelo.
 
 # Retorna
 - `G::ControlSystemsBase.TransferFunction`: modelo de la temperatura

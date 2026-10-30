@@ -12,6 +12,14 @@ using Test
         @test matrix2hex([1.0 2.0; 3.0 4.0]) == signal2hex([1.0, 2.0, 3.0, 4.0])
     end
 
+    @testset "Directorios de trabajo" begin
+        raiz = ThermoLab.PATH_DATA[]
+        @test isdir(joinpath(raiz, ThermoLab.DATA_DIR))
+        @test isdir(joinpath(raiz, ThermoLab.EXAMPLES_DIR))
+        @test isfile(ThermoLab._datafile("ThermoLab_static_pars.csv"))
+        @test ThermoLab._buscar_raiz_datos(raiz) == raiz
+    end
+
     @testset "Modelos guardados" begin
         G, L = get_last_model(sys)
         @test L ≈ SAMPLING_TIME

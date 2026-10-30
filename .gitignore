@@ -25,8 +25,8 @@ DCMotor.jl/
 # Carpetas creadas al cargar el paquete fuera de la raíz o de uso local
 test_package/
 resources/
-docs/datafiles/
-docs/ejemplos/
-test/datafiles/
-test/ejemplos/
+docs/datafiles_tmlab/
+docs/ejemplos_tmlab/
+test/datafiles_tmlab/
+test/ejemplos_tmlab/
 firmware/esp32_ThermoLab/build/

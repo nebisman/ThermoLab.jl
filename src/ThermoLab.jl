@@ -33,7 +33,7 @@ include("graphics.jl")
 
 # ── Inicialización ───────────────────────────────────────────────────────────
 # Se ejecuta cada vez que se hace `using ThermoLab`: fija PATH_DATA a la carpeta
-# (actual, superior o dos niveles arriba) que ya tenga datafiles/ o ejemplos/,
+# (actual, superior o dos niveles arriba) que ya tenga datafiles_tmlab/ o ejemplos_tmlab/,
 # o al directorio actual si no hay ninguna, y crea allí las que falten.
 function __init__()
     raiz = _buscar_raiz_datos(pwd())

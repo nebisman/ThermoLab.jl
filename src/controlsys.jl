@@ -315,7 +315,7 @@ Los parámetros de la figura se describen a continuación.
 # Notas
 
 - Los datos del experimento se guardan en el archivo CSV
-  `datafiles/ThermoLab_step_closed_exp.csv` del directorio de trabajo.
+  `datafiles_tmlab/ThermoLab_step_closed_exp.csv` del directorio de trabajo.
   
 - El resultado puede pasarse directamente a [`stepinfo`](@ref).
 
@@ -460,7 +460,7 @@ Los parámetros mostrados en la figura se describen a continuación:
   [`set_pid`](@ref) o [`set_controller`](@ref).
 
 - Los datos del experimento se guardan en el archivo CSV
-  `datafiles/ThermoLab_stairs_closed_exp.csv` del directorio de trabajo.
+  `datafiles_tmlab/ThermoLab_stairs_closed_exp.csv` del directorio de trabajo.
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab, de haber
@@ -598,7 +598,7 @@ Los parámetros de la función son los siguientes:
   [`set_pid`](@ref) o [`set_controller`](@ref).
 
 - Los datos del experimento se guardan en el archivo CSV
-  `datafiles/ThermoLab_profile_closed_exp.csv` del directorio de trabajo.
+  `datafiles_tmlab/ThermoLab_profile_closed_exp.csv` del directorio de trabajo.
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab, de haber
