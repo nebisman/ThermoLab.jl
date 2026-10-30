@@ -24,8 +24,8 @@ DEFAULT_REF = 40
 """
     set_reference(sys::ThermalSystem, ref::Real)
 
-Fija la referencia de temperatura de la plataforma ThermoLab en `ref` (°C). El
-controlador cargado en la plataforma (PID o general, ver [`set_pid`](@ref) y
+Fija la referencia de temperatura de la plataforma ThermoLab en el valor dado por
+el parámetro `ref` (°C). El controlador cargado en la plataforma (PID o general, ver [`set_pid`](@ref) y
 [`set_controller`](@ref)) lleva la temperatura a ese valor y la mantiene allí.
 
 # Argumentos
@@ -37,10 +37,9 @@ controlador cargado en la plataforma (PID o general, ver [`set_pid`](@ref) y
 - `nothing`. Imprime en consola la referencia fijada.
 
 # Notas
-- Al recibir una nueva referencia el firmware reinicia el estado del
-  controlador (por ejemplo, la acción integral del PID).
-- Todos los experimentos de este paquete fijan la referencia en 40 °C
-  (`DEFAULT_REFERENCE`) al terminar.
+- Al recibir una nueva referencia el firmware reinicia las variables de estado  del
+  controlador programado (por ejemplo, la acción integral en un PID).
+
 
 # Ejemplo
 ```julia
@@ -75,10 +74,10 @@ como el mostrado en la siguiente figura:
 
 La ley de control implementada es
 
-``u = k_p\\,(\\beta\\,r - y) + k_i \\displaystyle\\int_0^t (r - y)\\,d\\tau - \\dfrac{k_d\\,s}{1 + (k_d/N)\\,s}\\, y``
+``u = k_p\\,(\\beta\\,r - y) + \\dfrac{k_i}{s} (r-y) - \\dfrac{k_d\\,s}{1 + (k_d/N)\\,s}\\, y``
 
-donde ``r`` es la referencia (°C), ``y`` la temperatura medida (°C) y ``u`` la
-potencia aplicada (%), saturada al intervalo ``[0, 100]``.
+donde ``r`` es la referencia [°C];  ``y`` la temperatura medida [°C] y ``u`` la
+potencia porcentual aplicada [%].
 
 # Argumentos
 - `sys::ThermalSystem`: objeto que representa la plataforma.
@@ -96,12 +95,19 @@ potencia aplicada (%), saturada al intervalo ``[0, 100]``.
 
 # Notas
 - Con `beta=1.0` se obtiene el PID estándar de un grado de libertad (1-GDL).
-  La acción derivativa actúa solo sobre la temperatura medida.
-- Esta implementación se basa en el algoritmo del libro [*Feedback
-  Systems: An Introduction for Scientists and Engineers*](https://fbswiki.org/wiki/index.php/PID_Control),
-  segunda edición, de Åström y Murray, con anti-windup por cálculo hacia atrás
-  y periodo de muestreo de 0.8 s (`SAMPLING_TIME`).
+  La acción derivativa actúa sobre la temperatura medida y no sobre el error.
+
+- La estructura de 2-GDL con ponderación del punto de ajuste, el filtro del
+  derivador y el anti-windup se describen en detalle en Åström y Hägglund
+  (2006), *Advanced PID Control*.
 - Tras cargar el PID, la referencia se fija en 40 °C.
+
+# Referencias
+- Åström, K. J. y Hägglund, T. (2006). *Advanced PID Control*. ISA - The
+  Instrumentation, Systems, and Automation Society, Research Triangle Park, NC.
+- Åström, K. J. y Murray, R. M. (2021). [*Feedback Systems: An Introduction for
+  Scientists and Engineers*](https://fbswiki.org/wiki/index.php/PID_Control),
+  2.ª ed. Princeton University Press.
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab y de haber
@@ -116,9 +122,6 @@ Luego, el controlador PID se programa así:
 
 ```julia
 set_pid(sys; kp=11.8, ki=2.7, kd=0.0, N=10.0, beta=0.0)
-
-    Referencia fijada en 40.0 °C
-    PID actualizado: kp=11.8  ki=2.7  kd=0.0  N=10.0  β=0.0
 ```
 """
 function set_pid(sys::ThermalSystem;
@@ -149,7 +152,7 @@ end
 """
     set_controller(sys::ThermalSystem, controller)
 
-Programa un controlador general en la plataforma ThermoLab. El controlador se
+Programa un controlador general  en la plataforma ThermoLab. El controlador se
 define como una función de transferencia continua en la variable de Laplace
 `s`, la cual se discretiza automáticamente.
 
@@ -173,25 +176,31 @@ grados de libertad (2-GDL), como se muestra a continuación:
 
     ``u = C\\,(r - y)``
 
-  - Si ``C=[C_1\\quad C_2]`` es una matriz 1×2 (dos entradas y una salida), se
-    interpreta como controlador de 2-GDL:
+  - Si  ``C(s) = \\begin{bmatrix} \\dfrac{L(s)}{A(s)} & -\\dfrac{M(s)}{A(s)} \\end{bmatrix}``  es una matriz 1×2 (dos entradas y una salida), se interpreta como controlador de 2-GDL, cuya señal
+  de control se obtiene como:
 
-    ``u = C_1\\,r + C_2\\,y``
+  ``u = \\frac{L}{A} r - \\frac{M}{A}y``
 
     Por ejemplo, el controlador que retorna [`cont2dof`](@ref) tiene la forma
-    ``C_1=\\frac{L}{A}`` y ``C_2=-\\frac{M}{A}``.
+    ``C(s) = \\begin{bmatrix} \\dfrac{L(s)}{A(s)} & -\\dfrac{M(s)}{A(s)} \\end{bmatrix}`` .
 
 # Retorna
 - `nothing`. Imprime en consola el tipo y el orden del controlador cargado.
 
 # Notas
 - El controlador se lleva a una realización mínima en espacio de estados, se
-  discretiza con el método bilineal (Tustin) con periodo de muestreo de 0.8 s
-  (`SAMPLING_TIME`) y se expresa en forma modal.
+  discretiza con el método bilineal (Tustin) con periodo de muestreo de 0.8 s.
+
 - Se implementa un mecanismo anti-windup basado en un observador, cuya
   ganancia se calcula mediante el filtro de Kalman; la potencia aplicada se
-  satura al intervalo ``[0, 100]`` %.
-- Tras cargar el controlador, la referencia se fija en 40 °C.
+  satura al intervalo ``[0, 100]`` %. Este mecanismo se describe en Åström y
+  Wittenmark (1997), *Computer-Controlled Systems*.
+
+
+
+# Referencias
+- Åström, K. J. y Wittenmark, B. (1997). *Computer-Controlled Systems: Theory
+  and Design*, 3.ª ed. Prentice Hall, Upper Saddle River, NJ.
 
 # Ejemplos
 ## Ejemplo 1: controlador de un grado de libertad (1-GDL)
@@ -207,9 +216,6 @@ sys = ThermalSystem();
 s = tf("s");
 C = 10 + 2/s;
 set_controller(sys, C)
-
-    Referencia fijada en 40.0 °C
-    Controlador cargado en sistema térmico (1-DOF, orden=1)
 ```
 
 ## Ejemplo 2: controlador de dos grados de libertad (2-GDL)
@@ -307,10 +313,10 @@ Los parámetros de la figura se describen a continuación.
   referencia (°C), la temperatura medida (°C) y la potencia aplicada (%).
 
 # Notas
-- La respuesta se grafica en tiempo real durante el experimento.
-- Al terminar, la referencia se fija en 40 °C.
+
 - Los datos del experimento se guardan en el archivo CSV
   `datafiles/ThermoLab_step_closed_exp.csv` del directorio de trabajo.
+  
 - El resultado puede pasarse directamente a [`stepinfo`](@ref).
 
 # Ejemplo
@@ -427,8 +433,8 @@ end
     stairs_closed(sys::ThermalSystem; stairs=(40, 50, 55), duration=60)
 
 Ejecuta un experimento de seguimiento de una señal de referencia tipo
-"escalera" sobre la plataforma ThermoLab. La referencia toma sucesivamente
-cada uno de los valores definidos en `stairs`, cada uno con una duración
+"escalera" sobre la plataforma ThermoLab con el último controlador programado. La referencia toma sucesivamente
+cada uno de los valores definidos en `stairs`, cada uno de ellos con una duración
 `duration`, como se muestra en la figura siguiente:
 
 ![Señal de referencia tipo escalera para stairs_closed](../../assets/stairs_response.png)
@@ -452,8 +458,7 @@ Los parámetros mostrados en la figura se describen a continuación:
 # Notas
 - El controlador que actúa sobre la plataforma ha sido previamente cargado con
   [`set_pid`](@ref) o [`set_controller`](@ref).
-- La respuesta se grafica en tiempo real durante el experimento.
-- Al terminar, la referencia se fija en 40 °C.
+
 - Los datos del experimento se guardan en el archivo CSV
   `datafiles/ThermoLab_stairs_closed_exp.csv` del directorio de trabajo.
 
@@ -558,12 +563,14 @@ end
 """
     profile_closed(sys::ThermalSystem; timevalues=[0, 45, 90, 135], refvalues=[40, 55, 45, 50])
 
-Ejecuta en lazo cerrado un perfil de referencia arbitrario sobre la
-plataforma ThermoLab. El perfil se define por una serie de instantes de tiempo
+Ejecuta un experimento de seguimiento de un perfil de referencia arbitrario sobre la
+plataforma ThermoLab con el último controlador programado. El perfil se define por una serie de instantes de tiempo
 ``t_1, t_2, \\ldots, t_k`` (en `timevalues`) a los cuales corresponden,
 respectivamente, los valores de referencia ``r_1, r_2, \\ldots, r_k`` (en
-`refvalues`). Entre dos puntos consecutivos el firmware interpola
-linealmente la referencia, como se ilustra a continuación:
+`refvalues`). 
+
+El firmware de la plataforma interpola linealmente los puntos sucesivos definidos
+por el usuario, como se ilustra en la siguiente figura:
 
 ![Perfil de referencia definido por puntos para profile_closed](../../assets/profile_response.png)
 
@@ -589,8 +596,7 @@ Los parámetros de la función son los siguientes:
 # Notas
 - El controlador que actúa sobre la plataforma ha sido previamente cargado con
   [`set_pid`](@ref) o [`set_controller`](@ref).
-- La respuesta se grafica en tiempo real durante el experimento.
-- Al terminar, la referencia se fija en 40 °C.
+
 - Los datos del experimento se guardan en el archivo CSV
   `datafiles/ThermoLab_profile_closed_exp.csv` del directorio de trabajo.
 
@@ -772,11 +778,10 @@ opcionalmente, la respuesta simulada con un modelo de lazo cerrado nominal `T`.
   [`StepInfoSR`](@ref)). Al mostrarla se imprime un resumen en consola.
 
 # Notas
-- Todos los tiempos se miden desde el instante del escalón.
+- Todos los tiempos se miden desde el instante en que ocurre el cambio en el escalón.
 - El valor inicial `y0` es el promedio de hasta 10 muestras previas al
   escalón y el valor final `yf` el promedio de las últimas 10 muestras.
-- Si la respuesta no cruza alguno de los niveles de `risetime_th`, el tiempo
-  de subida es `NaN`.
+
 
 # Ejemplo
 Primero, asegúrese de haber importado el paquete ThermoLab, de haber
